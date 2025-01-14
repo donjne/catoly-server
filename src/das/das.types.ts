@@ -138,3 +138,148 @@ export interface FormattedNativeBalance {
   valueInUsd: number | null;
   pricePerSol: number | null;
 }
+
+export interface TokenBalance {
+  amount: number;
+  decimals: number;
+  uiAmount: number;
+  uiAmountString: string;
+}
+
+export interface ParsedTokenAccountData {
+  program: string;
+  parsed: {
+    info: {
+      mint: string;
+      owner: string;
+      state: string;
+      tokenAmount: TokenBalance;
+    };
+    type: string;
+  };
+}
+
+export interface JupiterPriceResponse {
+  data: {
+    [key: string]: {
+      id: string;
+      mintSymbol: string;
+      vsToken: string;
+      vsTokenSymbol: string;
+      price: string;
+    };
+  };
+}
+
+export interface TokenPriceResponse {
+  price: string;
+  symbol?: string;
+  vsToken: string;
+  vsTokenSymbol: string;
+}
+
+export interface TLDResponse {
+  tlds: string[];
+}
+
+export interface BlockTransaction {
+  index: number;
+  signature?: string;
+  meta: any;
+  invocations: Map<string, number>;
+}
+
+export interface BlockTransactionResponse {
+  status: 'success' | 'error';
+  oldest?: string;
+  result?: any[];
+  message?: string;
+}
+
+export interface SignaturesResponse {
+  jsonrpc: string;
+  result: {
+    total: number;
+    limit: number;
+    page: number;
+    items: string[][];
+  };
+  id: string;
+}
+
+export interface CNFTTransactionResponse {
+  status: 'success' | 'error';
+  oldest?: string;
+  result?: any[];
+  message?: string;
+}
+
+// export interface MerkleTreeResult {
+//   authority: string;
+//   canopyDepth: number;
+//   creationSlot: number;
+//   maxBufferSize: number;
+//   rightMostIndex: number;
+//   root: string;
+//   seq: string;
+//   treeHeight: number;
+// }
+
+// export interface MerkleTreeResponse {
+//   status: 'success' | 'error';
+//   result?: MerkleTreeResult;
+//   message?: string;
+// }
+
+export interface SlotResponse {
+  status: 'success' | 'error';
+  slot?: number;
+  message?: string;
+}
+
+export interface RawTransactionResponse {
+  status: 'success' | 'error';
+  transaction?: any;
+  message?: string;
+}
+
+export interface EnrichedTransactionResponse {
+  status: 'success' | 'error';
+  transaction?: any;
+  message?: string;
+}
+
+export interface TransactionsResponse {
+  status: 'success' | 'error';
+  oldest?: string;
+  result?: any[];
+  message?: string;
+}
+
+export interface TPSResponse {
+  status: 'success' | 'error';
+  tps?: number;
+  message?: string;
+}
+
+export interface Username {
+  type: string;
+  username: string;
+}
+
+export interface NiftyAssetResponse {
+  status: 'success' | 'error';
+  assetData?: any;
+  message?: string;
+}
+
+export interface DomainResponse {
+  status: 'success' | 'error';
+  usernames?: Username[];
+  message?: string;
+}
+
+export interface DomainResolveResponse {
+  address?: string;
+  message?: string;
+}

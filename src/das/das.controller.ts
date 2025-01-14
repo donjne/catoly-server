@@ -9,9 +9,22 @@ import {
 } from '@nestjs/common';
 import { DasService } from './das.service';
 import {
+  BlockTransactionResponse,
+  CNFTTransactionResponse,
+  DomainResolveResponse,
+  DomainResponse,
+  EnrichedTransactionResponse,
   FormattedNativeBalance,
+  // MerkleTreeResponse,
+  NiftyAssetResponse,
   PortfolioSummary,
   PortfolioValue,
+  RawTransactionResponse,
+  SlotResponse,
+  TLDResponse,
+  TokenPriceResponse,
+  TPSResponse,
+  TransactionsResponse,
 } from './das.types';
 
 @Controller('das')
@@ -74,5 +87,113 @@ export class DasController {
   @Get('portfolio/:address')
   async getCompleteBalance(@Param('address') ownerAddress: string) {
     return this.dasService.getCompleteWalletBalance(ownerAddress);
+  }
+
+  @Get('balance')
+  async getBalance(
+    @Param('wallet') walletAddress: string,
+    @Query('token') tokenAddress?: string,
+  ): Promise<number> {
+    return this.dasService.getTokenOrNativeBalance(walletAddress, tokenAddress);
+  }
+
+  @Get('price/:tokenAddress')
+  async getPrice(
+    @Param('tokenAddress') tokenAddress: string,
+  ): Promise<TokenPriceResponse> {
+    return this.dasService.getTokenPrice(tokenAddress);
+  }
+
+  @Get('tlds')
+  async getAllTLDs(): Promise<TLDResponse> {
+    return this.dasService.getAllTLDs();
+  }
+
+  @Get('block/:slot')
+  async getBlockTransactions(
+    @Param('slot', ParseIntPipe) slot: number,
+    @Query('cursor') cursor?: string,
+    @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit?: number,
+  ): Promise<BlockTransactionResponse> {
+    return this.dasService.getBlockTransactions(slot, cursor, limit);
+  }
+
+  @Get('cnft/:assetId')
+  async getCNFTTransactions(
+    @Param('assetId') assetId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ): Promise<CNFTTransactionResponse> {
+    return this.dasService.getCNFTTransactions(assetId, page, limit);
+  }
+
+  // @Get('merkle/:address')
+  // async getMerkleTree(
+  //   @Param('address') address: string,
+  // ): Promise<MerkleTreeResponse> {
+  //   return this.dasService.getMerkleTree(address);
+  // }
+
+  @Get('slot')
+async getCurrentSlot(): Promise<SlotResponse> {
+  return this.dasService.getCurrentSlot();
+}
+
+  @Get('transaction/:signature')
+  async getRawTransaction(
+    @Param('signature') signature: string,
+  ): Promise<RawTransactionResponse> {
+    return this.dasService.getRawTransaction(signature);
+  }
+
+  @Get('tps')
+  async getTPS(): Promise<TPSResponse> {
+    return this.dasService.getTPS();
+  }
+
+  @Get('enriched-transaction/:signature')
+  async getEnrichedTransaction(
+    @Param('signature') signature: string,
+    @Query('account') account?: string,
+  ): Promise<EnrichedTransactionResponse> {
+    return this.dasService.getEnrichedTransaction(signature, account);
+  }
+
+  @Get('account-transactions/:account')
+  async getAccountTransactions(
+    @Param('account') account: string,
+    @Query('cursor') cursor?: string,
+    @Query('filter') filter?: string,
+    @Query('user') user?: string,
+  ): Promise<TransactionsResponse> {
+    return this.dasService.getAccountTransactions(account, { cursor, filter, user });
+  }
+
+  @Get('nifty/:address')
+async getNiftyAsset(
+  @Param('address') address: string
+): Promise<NiftyAssetResponse> {
+  return this.dasService.getNiftyAsset(address);
+}
+
+  @Get('domain/:address')
+  async getSolanaDomain(
+    @Param('address') address: string
+  ): Promise<DomainResponse> {
+    return this.dasService.getSolanaDomain(address);
+  }
+
+  @Get('domain/resolve/all/:domain')
+  async resolveAllDomains(
+    @Param('domain') domain: string
+  ): Promise<DomainResolveResponse> {
+    return this.dasService.resolveAllDomains(domain);
+  }
+
+  @Get('domain/resolve/sol/:domain')
+  async resolveSolDomain(
+    @Param('domain') domain: string
+  ): Promise<DomainResolveResponse> {
+    return this.dasService.resolveSolDomain(domain);
   }
 }
