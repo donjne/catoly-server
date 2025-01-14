@@ -1,4 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
 
 export type ImageSize = '256x256' | '512x512' | '1024x1024';
 
@@ -123,4 +124,42 @@ export interface TipLinkResponse {
   export interface RPSGameResponse {
     outcome: string;
   }
+
+  export interface PositionInfo {
+    whirlpoolAddress: string;
+    positionInRange: boolean;
+    distanceFromCenterBps: number;
+  }
+
+  export type PositionDataMap = {
+    [positionMintAddress: string]: PositionInfo;
+  };
   
+  export type BNType = BN
+
+  export interface GibworkCreateTaskReponse {
+    status: "success" | "error";
+    taskId?: string | undefined;
+    signature?: string | undefined;
+  }
+
+  export interface OrderParams {
+    quantity: number;
+    side: string;
+    price: number;
+  }
+  
+  export interface BatchOrderPattern {
+    side: string;
+    totalQuantity?: number;
+    priceRange?: {
+      min?: number;
+      max?: number;
+    };
+    spacing?: {
+      type: "percentage" | "fixed";
+      value: number;
+    };
+    numberOfOrders?: number;
+    individualQuantity?: number;
+  }
