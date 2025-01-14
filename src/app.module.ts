@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { GeckoModule } from './gecko/gecko.module';
 import { DasModule } from './das/das.module';
+import { ActionsModule } from './actions/actions.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { DasModule } from './das/das.module';
     }),
     GeckoModule,
     DasModule,
+    ActionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
