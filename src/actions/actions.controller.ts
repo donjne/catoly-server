@@ -1,7 +1,7 @@
 // actions.controller.ts
 import { Controller, Post, Body, Query, DefaultValuePipe, ParseIntPipe, Get, Param } from '@nestjs/common';
 import { ActionsService } from './actions.service';
-import { AirdropCostEstimate, AirdropOptions, AirdropResponse, CollectionDeployment, CollectionOptions, FaucetResponse, ImageGenerationResponse, ImageSize, LendingResponse, MintCollectionNFTResponse, NFTListingResponse, NFTMetadata, PumpfunLaunchResponse, PumpFunTokenOptions, StakeResponse, TipLinkResponse, TokenCheck, TradeResponse, TransferResponse } from './actions.types';
+import { AirdropCostEstimate, AirdropOptions, AirdropResponse, CollectionDeployment, CollectionOptions, FaucetResponse, ImageGenerationResponse, ImageSize, LendingResponse, MintCollectionNFTResponse, NFTListingResponse, NFTMetadata, PumpfunLaunchResponse, PumpFunTokenOptions, RPSGameResponse, StakeResponse, TipLinkResponse, TokenCheck, TradeResponse, TransferResponse } from './actions.types';
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 @Controller('actions')
@@ -290,6 +290,25 @@ async launchPumpFunToken(
       body.recipient,
       body.amount,
       body.mintAddress
+    );
+  }
+
+  @Post('game/rps')
+  async playRockPaperScissors(
+    @Body() body: {
+      walletKeypair: string;
+      amount: number;
+      choice: 'rock' | 'paper' | 'scissors';
+    }
+  ): Promise<RPSGameResponse> {
+    const walletKeypair = Keypair.fromSecretKey(
+      Buffer.from(JSON.parse(body.walletKeypair))
+    );
+
+    return this.actionsService.playRockPaperScissors(
+      walletKeypair,
+      body.amount,
+      body.choice
     );
   }
 }
