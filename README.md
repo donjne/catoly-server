@@ -27,6 +27,15 @@
   - [Staking Operations](#staking-operations)
   - [Airdrop Operations](#airdrop-operations)
   - [Game Operations](#game-operations)
+  - [Generate Image](#generate-image)
+  - [Create Tip Link](#create-tip-link)
+  - [Deploy Collection](#deploy-collection)
+  - [Launch PumpFun Token](#launch-pumpfun-token)
+  - [Lend USDC](#lend-usdc)
+  - [Mint Collection NFT](#mint-collection-nft)
+  - [Request Faucet Funds](#request-faucet-funds)
+  - [Check Token Summary](#check-token-summary)
+  - [Check Token Detailed Report](#check-token-detailed-report)
 
 ## DAS Endpoints
 
@@ -592,3 +601,147 @@ Parameters (body):
 - choice (string): One of: "rock", "paper", "scissors"
 
 Response: RPSGameResponse with game outcome
+
+### Generate Image
+
+```bash
+POST /actions/create/image
+```
+
+Generates an image based on a text prompt.
+
+Parameters:
+
+prompt (body): Text describing the image to generate
+size (query, optional): Image size, default '1024x1024'
+count (query, optional): Number of images to generate, default 1
+
+Response: ImageGenerationResponse with generated image URLs
+
+### Create Tip Link
+
+```bash
+POST /actions/create/tiplink
+```
+
+Creates a tip link for sending tokens.
+
+Parameters (body):
+
+walletAddress (string): Public key of the wallet receiving tips
+walletKeypair (string): Private key for signing
+amount (number): Amount to send when the tip link is used
+splMintAddress (string, optional): Mint address for SPL token if not SOL
+
+Response: TipLinkResponse with the tip link
+
+### Deploy Collection
+
+```bash
+POST /actions/deploy/collection
+```
+
+Deploys a new NFT collection.
+
+Parameters (body):
+
+walletKeypair (string): Private key for signing
+options (object): CollectionOptions defining collection parameters
+
+Response: CollectionDeployment with collection details
+
+### Launch PumpFun Token
+
+```bash
+POST /actions/launch/pumpfun
+```
+
+Launches a new token on Pump.fun.
+
+Parameters (body):
+
+walletKeypair (string): Private key for signing
+tokenName (string): Name of the token
+tokenTicker (string): Ticker symbol for the token
+description (string): Token description
+imageUrl (string): URL for token image
+options (object, optional): Additional token options
+
+Response: PumpfunLaunchResponse with token launch details
+
+### Lend USDC
+
+```bash
+POST /actions/lend/usdc
+```
+
+Lends USDC through a lending protocol.
+
+Parameters (body):
+
+walletKeypair (string): Private key for signing
+amount (number): Amount of USDC to lend
+
+Response: LendingResponse with transaction details
+
+### Mint Collection NFT
+
+```bash
+POST /actions/mint/collection-nft
+```
+
+Mints an NFT from an existing collection.
+
+Parameters (body):
+
+walletKeypair (string): Private key for signing
+collectionAddress (string): Address of the collection
+metadata (object): NFTMetadata object defining NFT properties
+recipientAddress (string, optional): Address to mint the NFT to
+
+Response: MintCollectionNFTResponse with minting details
+
+### Request Faucet Funds
+
+```bash
+POST /actions/faucet/request
+```
+
+Requests funds from a testnet faucet.
+
+Parameters (body):
+
+walletKeypair (string): Private key for signing
+amount (number, optional): Amount to request
+
+Response: FaucetResponse with transaction details
+
+### Check Token Summary
+
+```bash
+GET /actions/token/check/summary/:mint
+```
+
+Gets a summary report for a token.
+
+Parameters:
+
+mint (path): Mint address of the token
+
+Response: TokenCheck with summary data
+
+### Check Token Detailed Report
+
+```bash
+GET /actions/token/check/detailed/:mint
+```
+
+Gets a detailed report for a token.
+
+Parameters:
+
+mint (path): Mint address of the token
+
+Response: TokenCheck with detailed data
+
+This section should now comprehensively cover all endpoints present in the `actions.controller.ts` file.
