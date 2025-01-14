@@ -275,7 +275,9 @@ result: An array of transactions.
 
 #### Get Nifty Asset
 
+```bash
 GET /das/nifty/:address
+```
 
 Retrieves Nifty asset data.
 
@@ -287,7 +289,9 @@ Response: NiftyAssetResponse with asset details
 
 #### Get Solana Domain
 
+```bash
 GET /das/domain/:address
+```
 
 Retrieves Solana domain names for an address.
 
@@ -299,7 +303,9 @@ Response: DomainResponse with associated domains
 
 #### Resolve All Domains
 
+```bash
 GET /das/domain/resolve/all/:domain
+```
 
 Resolves a domain across all TLDs.
 
@@ -311,7 +317,9 @@ Response: DomainResolveResponse with resolved address
 
 #### Resolve .sol Domain
 
+```bash
 GET /das/domain/resolve/sol/:domain
+```
 
 Resolves a .sol domain name.
 
