@@ -252,12 +252,21 @@ export class ActionsService {
         };
       }
     } catch (error) {
+      console.error('TipLink Creation Error Details:', {
+          error,
+          message: error.message,
+          stack: error.stack,
+          walletAddress: walletAddress.toString(),
+          amount,
+          splMintAddress: splMintAddress || 'none'
+      });
+  
       throw new HttpException(
-        `Failed to create TipLink: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        HttpStatus.INTERNAL_SERVER_ERROR
+          `Failed to create TipLink: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          HttpStatus.INTERNAL_SERVER_ERROR
       );
-    }
   }
+}
 
   async deployCollection(
     walletKeypair: Keypair,
