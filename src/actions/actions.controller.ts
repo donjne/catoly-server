@@ -1,7 +1,7 @@
 // actions.controller.ts
 import { Controller, Post, Body, Query, DefaultValuePipe, ParseIntPipe, Get, Param } from '@nestjs/common';
 import { ActionsService } from './actions.service';
-import { AirdropCostEstimate, AirdropOptions, AirdropResponse, CollectionDeployment, CollectionOptions, FaucetResponse, ImageGenerationResponse, ImageSize, LendingResponse, MintCollectionNFTResponse, NFTListingResponse, NFTMetadata, PumpfunLaunchResponse, PumpFunTokenOptions, RPSGameResponse, StakeResponse, TipLinkResponse, TokenCheck, TradeResponse, TransferResponse } from './actions.types';
+import { AirdropCostEstimate, AirdropOptions, AirdropResponse, BaseOptions, CollectionDeployment, CollectionOptions, FaucetResponse, ImageGenerationResponse, ImageSize, LendingOptions, LendingResponse, MintCollectionNFTResponse, MintNFTOptions, NFTListingOptions, NFTListingResponse, NFTMetadata, PumpfunLaunchResponse, PumpFunTokenOptions, RPSGameOptions, RPSGameResponse, StakeOptions, StakeResponse, TipLinkOptions, TipLinkResponse, TokenCheck, TradeOptions, TradeResponse, TransferOptions, TransferResponse } from './actions.types';
 import { Keypair, PublicKey } from '@solana/web3.js';
 
 @Controller('actions')
@@ -22,8 +22,7 @@ export class ActionsController {
     @Body() body: {
       walletAddress: string;
       walletKeypair: string;
-      amount: number;
-      splMintAddress?: string;
+      options: TipLinkOptions
     }
   ): Promise<TipLinkResponse> {
     const walletAddress = new PublicKey(body.walletAddress);
@@ -34,8 +33,7 @@ export class ActionsController {
     return this.actionsService.createTipLink(
       walletAddress,
       walletKeypair,
-      body.amount,
-      body.splMintAddress
+      body.options
     );
   }
 
@@ -58,35 +56,32 @@ export class ActionsController {
   }
 
   @Post('launch/pumpfun')
-async launchPumpFunToken(
-  @Body() body: {
-    walletKeypair: string;
-    tokenName: string;
-    tokenTicker: string;
-    description: string;
-    imageUrl: string;
-    options?: PumpFunTokenOptions;
+  async launchPumpFunToken(
+    @Body() body: {
+      walletKeypair: string;
+      options: {
+        tokenName: string;
+        tokenTicker: string;
+        description: string;
+        imageUrl: string;
+      } & PumpFunTokenOptions;
+    }
+  ): Promise<PumpfunLaunchResponse> {
+    const walletKeypair = Keypair.fromSecretKey(
+      Buffer.from(JSON.parse(body.walletKeypair))
+    );
+  
+    return this.actionsService.launchPumpFunToken(
+      walletKeypair,
+      body.options
+    );
   }
-): Promise<PumpfunLaunchResponse> {
-  const walletKeypair = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(body.walletKeypair))
-  );
-
-  return this.actionsService.launchPumpFunToken(
-    walletKeypair,
-    body.tokenName,
-    body.tokenTicker,
-    body.description,
-    body.imageUrl,
-    body.options
-  );
-}
 
   @Post('lend/usdc')
   async lendAsset(
     @Body() body: {
       walletKeypair: string;
-      amount: number;
+      options: LendingOptions;
     }
   ): Promise<LendingResponse> {
     const walletKeypair = Keypair.fromSecretKey(
@@ -95,7 +90,7 @@ async launchPumpFunToken(
 
     return this.actionsService.lendAsset(
       walletKeypair,
-      body.amount
+      body.options
     );
   }
 
@@ -103,9 +98,7 @@ async launchPumpFunToken(
   async mintCollectionNFT(
     @Body() body: {
       walletKeypair: string;
-      collectionAddress: string;
-      metadata: NFTMetadata;
-      recipientAddress?: string;
+      options: MintNFTOptions;
     }
   ): Promise<MintCollectionNFTResponse> {
     const walletKeypair = Keypair.fromSecretKey(
@@ -114,9 +107,7 @@ async launchPumpFunToken(
 
     return this.actionsService.mintCollectionNFT(
       walletKeypair,
-      body.collectionAddress,
-      body.metadata,
-      body.recipientAddress
+      body.options
     );
   }
 
@@ -183,7 +174,7 @@ async launchPumpFunToken(
   async stakeWithJup(
     @Body() body: {
       walletKeypair: string;
-      amount: number;
+      options: StakeOptions;
     }
   ): Promise<StakeResponse> {
     const walletKeypair = Keypair.fromSecretKey(
@@ -192,7 +183,7 @@ async launchPumpFunToken(
 
     return this.actionsService.stakeWithJup(
       walletKeypair,
-      body.amount
+      body.options
     );
   }
 
@@ -200,7 +191,7 @@ async launchPumpFunToken(
   async stakeWithSolayer(
     @Body() body: {
       walletKeypair: string;
-      amount: number;
+      options: StakeOptions;
     }
   ): Promise<StakeResponse> {
     const walletKeypair = Keypair.fromSecretKey(
@@ -209,7 +200,7 @@ async launchPumpFunToken(
 
     return this.actionsService.stakeWithSolayer(
       walletKeypair,
-      body.amount
+      body.options
     );
   }
 
@@ -217,18 +208,16 @@ async launchPumpFunToken(
   async listNFTForSale(
     @Body() body: {
       walletKeypair: string;
-      nftMint: string;
-      price: number;
+      options: NFTListingOptions;
     }
   ): Promise<NFTListingResponse> {
     const walletKeypair = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(body.walletKeypair))
     );
-
+  
     return this.actionsService.listNFTForSale(
       walletKeypair,
-      body.nftMint,
-      body.price
+      body.options
     );
   }
 
@@ -236,16 +225,16 @@ async launchPumpFunToken(
   async cancelNFTListing(
     @Body() body: {
       walletKeypair: string;
-      nftMint: string;
+      options: { nftMint: string } & BaseOptions;
     }
   ): Promise<NFTListingResponse> {
     const walletKeypair = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(body.walletKeypair))
     );
-
+  
     return this.actionsService.cancelNFTListing(
       walletKeypair,
-      body.nftMint
+      body.options
     );
   }
 
@@ -253,22 +242,16 @@ async launchPumpFunToken(
   async tradeTokens(
     @Body() body: {
       walletKeypair: string;
-      outputMint: string;
-      inputAmount: number;
-      inputMint?: string;
-      slippageBps?: number;
+      options: TradeOptions;
     }
   ): Promise<TradeResponse> {
     const walletKeypair = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(body.walletKeypair))
     );
-
+  
     return this.actionsService.tradeTokens(
       walletKeypair,
-      body.outputMint,
-      body.inputAmount,
-      body.inputMint,
-      body.slippageBps
+      body.options
     );
   }
 
@@ -276,20 +259,16 @@ async launchPumpFunToken(
   async transferTokens(
     @Body() body: {
       walletKeypair: string;
-      recipient: string;
-      amount: number;
-      mintAddress?: string;
+      options: TransferOptions;
     }
   ): Promise<TransferResponse> {
     const walletKeypair = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(body.walletKeypair))
     );
-
+  
     return this.actionsService.transferTokens(
       walletKeypair,
-      body.recipient,
-      body.amount,
-      body.mintAddress
+      body.options
     );
   }
 
@@ -297,18 +276,16 @@ async launchPumpFunToken(
   async playRockPaperScissors(
     @Body() body: {
       walletKeypair: string;
-      amount: number;
-      choice: 'rock' | 'paper' | 'scissors';
+      options: RPSGameOptions;
     }
   ): Promise<RPSGameResponse> {
     const walletKeypair = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(body.walletKeypair))
     );
-
+  
     return this.actionsService.playRockPaperScissors(
       walletKeypair,
-      body.amount,
-      body.choice
+      body.options
     );
   }
 }

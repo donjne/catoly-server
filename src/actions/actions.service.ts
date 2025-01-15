@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { AirdropCostEstimate, AirdropOptions, AirdropResponse, CollectionDeployment, CollectionOptions, FaucetResponse, ImageGenerationResponse, ImageSize, LendingResponse, MintCollectionNFTResponse, NFTListingResponse, NFTMetadata, PumpfunLaunchResponse, PumpFunTokenOptions, RPSGameResponse, StakeResponse, TipLinkResponse, TokenCheck, TokenDeploymentOptions, TokenDeploymentResponse, TradeResponse, TransferResponse } from './actions.types';
+import { AirdropCostEstimate, AirdropOptions, AirdropResponse, BaseOptions, CollectionDeployment, CollectionOptions, FaucetResponse, ImageGenerationResponse, ImageSize, LendingOptions, LendingResponse, MintCollectionNFTResponse, MintNFTOptions, NFTListingOptions, NFTListingResponse, NFTMetadata, PumpfunLaunchResponse, PumpFunTokenOptions, RPSGameOptions, RPSGameResponse, StakeOptions, StakeResponse, TipLinkOptions, TipLinkResponse, TokenCheck, TokenDeploymentOptions, TokenDeploymentResponse, TradeOptions, TradeResponse, TransferOptions, TransferResponse } from './actions.types';
 import { TipLink } from '@tiplink/api';
 import {
   Transaction,
@@ -68,9 +68,12 @@ import { TensorSwapSDK } from "@tensor-oss/tensorswap-sdk";
 
 @Injectable()
 export class ActionsService {
-  private readonly heliusUrl: string;
-  private readonly SOL_DECIMALS = 9;
-  private readonly VOTE_PROGRAM_ID = new PublicKey('Vote111111111111111111111111111111111111111');
+  private readonly heliusMainnetUrl: string;
+  private readonly heliusDevnetUrl: string;
+  private readonly NETWORK_URLS = {
+    mainnet: "",
+    devnet: ""
+  };
   private readonly openai: OpenAI;
   private readonly MINIMUM_SOL_BALANCE = 0.003 * LAMPORTS_PER_SOL;
   private readonly RUGCHECK_BASE_URL = 'https://api.rugcheck.xyz/v1';
@@ -100,10 +103,56 @@ export class ActionsService {
       throw new Error('OPENAI_API_KEY is not defined in environment variables');
     }
 
-    this.heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
+    this.heliusMainnetUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
+    this.heliusDevnetUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
+    this.NETWORK_URLS.mainnet = this.heliusMainnetUrl;
+    this.NETWORK_URLS.devnet = this.heliusDevnetUrl;
+
     this.openai = new OpenAI({
       apiKey: openaiKey,
     });
+  }
+
+  private async detectNetwork(walletKeypair: Keypair): Promise<'mainnet' | 'devnet'> {
+    try {
+      // Try mainnet first
+      const mainnetConnection = new Connection(this.heliusMainnetUrl);
+      const balance = await mainnetConnection.getBalance(walletKeypair.publicKey);
+      if (balance > 0) {
+        return 'mainnet';
+      }
+
+      // Try devnet
+      const devnetConnection = new Connection(this.heliusDevnetUrl);
+      const devBalance = await devnetConnection.getBalance(walletKeypair.publicKey);
+      if (devBalance > 0) {
+        return 'devnet';
+      }
+
+      // Default to devnet if no balance found on either
+      return 'devnet';
+    } catch {
+      // Default to mainnet if detection fails
+      return 'mainnet';
+    }
+  }
+
+ 
+  private async getRpcUrl(walletKeypair: Keypair, preferredNetwork?: 'mainnet' | 'devnet'): Promise<string> {
+    // If network preference is specified, use it
+    if (preferredNetwork) {
+      return this.NETWORK_URLS[preferredNetwork];
+    }
+
+    // Otherwise detect the network
+    const detectedNetwork = await this.detectNetwork(walletKeypair);
+    return this.NETWORK_URLS[detectedNetwork];
+  }
+
+  // Helper for creating connections
+  private async createConnection(walletKeypair: Keypair, options?: BaseOptions): Promise<Connection> {
+    const rpcUrl = await this.getRpcUrl(walletKeypair, options?.network);
+    return new Connection(rpcUrl, 'confirmed');
   }
 
   async generateImage(
@@ -157,21 +206,21 @@ export class ActionsService {
   async createTipLink(
     walletAddress: PublicKey,
     walletKeypair: Keypair,
-    amount: number,
-    splMintAddress?: string
+    options: TipLinkOptions
   ): Promise<TipLinkResponse> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
+      // Use the new createConnection helper
+      const connection = await this.createConnection(walletKeypair, options);
       const tiplink = await TipLink.create();
   
-      if (!splMintAddress) {
+      if (!options.splMintAddress) {
         // Handle SOL transfer
         const transaction = new Transaction();
         transaction.add(
           SystemProgram.transfer({
             fromPubkey: walletAddress,
             toPubkey: tiplink.keypair.publicKey,
-            lamports: amount * LAMPORTS_PER_SOL,
+            lamports: options.amount * LAMPORTS_PER_SOL,
           })
         );
   
@@ -188,7 +237,7 @@ export class ActionsService {
         };
       } else {
         // Handle SPL token transfer
-        const mintPubkey = new PublicKey(splMintAddress);
+        const mintPubkey = new PublicKey(options.splMintAddress);
         const fromAta = await getAssociatedTokenAddress(
           mintPubkey,
           walletAddress
@@ -199,7 +248,7 @@ export class ActionsService {
         );
   
         const mintInfo = await getMint(connection, mintPubkey);
-        const adjustedAmount = amount * Math.pow(10, mintInfo.decimals);
+        const adjustedAmount = options.amount * Math.pow(10, mintInfo.decimals);
   
         const transaction = new Transaction();
         
@@ -253,28 +302,32 @@ export class ActionsService {
       }
     } catch (error) {
       console.error('TipLink Creation Error Details:', {
-          error,
-          message: error.message,
-          stack: error.stack,
-          walletAddress: walletAddress.toString(),
-          amount,
-          splMintAddress: splMintAddress || 'none'
+        error,
+        message: error.message,
+        stack: error.stack,
+        walletAddress: walletAddress.toString(),
+        amount: options.amount,
+        splMintAddress: options.splMintAddress || 'none',
+        network: options.network || 'auto-detect'
       });
   
       throw new HttpException(
-          `Failed to create TipLink: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          HttpStatus.INTERNAL_SERVER_ERROR
+        `Failed to create TipLink: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
+    }
   }
-}
 
   async deployCollection(
     walletKeypair: Keypair,
     options: CollectionOptions
   ): Promise<CollectionDeployment> {
     try {
-      // Initialize Umi with Helius endpoint
-      const umi = createUmi(this.heliusUrl).use(mplCore());
+      // Get appropriate RPC URL for the network
+      const rpcUrl = await this.getRpcUrl(walletKeypair, options.network);
+      
+      // Initialize Umi with the proper network
+      const umi = createUmi(rpcUrl).use(mplCore());
       umi.use(keypairIdentity(fromWeb3JsKeypair(walletKeypair)));
   
       // Generate collection signer
@@ -323,6 +376,14 @@ export class ActionsService {
         signature: tx.signature.toString(),
       };
     } catch (error) {
+      console.error('Collection Deployment Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        name: options.name
+      });
+  
       if (error instanceof HttpException) {
         throw error;
       }
@@ -353,9 +414,9 @@ export class ActionsService {
           HttpStatus.BAD_REQUEST
         );
       }
-  
+      const rpcUrl = await this.getRpcUrl(walletKeypair, options.network);
       // Initialize Umi
-      const umi = createUmi(this.heliusUrl).use(mplToolbox());
+      const umi = createUmi(rpcUrl).use(mplToolbox());
       umi.use(keypairIdentity(fromWeb3JsKeypair(walletKeypair)));
   
       // Generate mint signer
@@ -497,9 +558,10 @@ export class ActionsService {
     mintKeypair: Keypair,
     walletKeypair: Keypair,
     tx: VersionedTransaction,
+    options?: BaseOptions,
   ): Promise<string> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
+      const connection = await this.createConnection(walletKeypair, options);
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   
       tx.message.recentBlockhash = blockhash;
@@ -538,15 +600,16 @@ export class ActionsService {
   
   async launchPumpFunToken(
     walletKeypair: Keypair,
-    tokenName: string,
-    tokenTicker: string,
-    description: string,
-    imageUrl: string,
-    options?: PumpFunTokenOptions,
+    options: {
+      tokenName: string;
+      tokenTicker: string;
+      description: string;
+      imageUrl: string;
+    } & PumpFunTokenOptions
   ): Promise<PumpfunLaunchResponse> {
     try {
       // Input validation
-      if (!tokenName || !tokenTicker || !description || !imageUrl) {
+      if (!options.tokenName || !options.tokenTicker || !options.description || !options.imageUrl) {
         throw new HttpException(
           'Token name, ticker, description, and image URL are required',
           HttpStatus.BAD_REQUEST
@@ -557,11 +620,11 @@ export class ActionsService {
   
       // Upload metadata
       const metadataResponse = await this.uploadPumpMetadata(
-        tokenName,
-        tokenTicker,
-        description,
-        imageUrl,
-        options,
+        options.tokenName,
+        options.tokenTicker,
+        options.description,
+        options.imageUrl,
+        options
       );
   
       // Create transaction
@@ -569,7 +632,7 @@ export class ActionsService {
         walletKeypair.publicKey,
         mintKeypair,
         metadataResponse,
-        options,
+        options
       );
   
       // Process and sign transaction
@@ -581,6 +644,7 @@ export class ActionsService {
         mintKeypair,
         walletKeypair,
         tx,
+        options  // Pass network options
       );
   
       return {
@@ -589,6 +653,14 @@ export class ActionsService {
         metadataUri: metadataResponse.metadataUri,
       };
     } catch (error) {
+      console.error('Token Launch Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        tokenName: options.tokenName
+      });
+  
       if (error instanceof HttpException) {
         throw error;
       }
@@ -601,20 +673,20 @@ export class ActionsService {
 
   async lendAsset(
     walletKeypair: Keypair,
-    amount: number
-  ): Promise<LendingResponse> {
+    options: LendingOptions
+   ): Promise<LendingResponse> {
     try {
       // Input validation
-      if (!amount || amount <= 0) {
+      if (!options.amount || options.amount <= 0) {
         throw new HttpException(
           'Amount must be greater than 0',
           HttpStatus.BAD_REQUEST
         );
       }
-  
+   
       // Fetch transaction data from Lulo
       const response = await fetch(
-        `https://blink.lulo.fi/actions?amount=${amount}&symbol=USDC`,
+        `https://blink.lulo.fi/actions?amount=${options.amount}&symbol=USDC`,
         {
           method: 'POST',
           headers: {
@@ -625,53 +697,61 @@ export class ActionsService {
           }),
         }
       );
-  
+   
       if (!response.ok) {
         throw new HttpException(
           'Failed to fetch transaction from Lulo',
           HttpStatus.BAD_GATEWAY
         );
       }
-  
+   
       const data = await response.json();
       
-      // Create connection instance
-      const connection = new Connection(this.heliusUrl, 'confirmed');
-  
+      // Create connection instance using our helper
+      const connection = await this.createConnection(walletKeypair, options);
+   
       // Deserialize and prepare transaction
       const luloTxn = VersionedTransaction.deserialize(
         Buffer.from(data.transaction, 'base64')
       );
-  
+   
       // Get and set recent blockhash
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       luloTxn.message.recentBlockhash = blockhash;
-  
+   
       // Sign transaction
       luloTxn.sign([walletKeypair]);
-  
+   
       // Send transaction
       const signature = await connection.sendTransaction(luloTxn, {
         preflightCommitment: 'confirmed',
         maxRetries: 3,
       });
-  
+   
       // Confirm transaction
       const confirmation = await connection.confirmTransaction({
         signature,
         blockhash,
         lastValidBlockHeight,
       });
-  
+   
       if (confirmation.value.err) {
         throw new HttpException(
           `Transaction failed: ${confirmation.value.err}`,
           HttpStatus.BAD_REQUEST
         );
       }
-  
+   
       return { signature };
     } catch (error) {
+      console.error('Lending Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        amount: options.amount,
+        network: options.network || 'auto-detect'
+      });
+   
       if (error instanceof HttpException) {
         throw error;
       }
@@ -680,39 +760,37 @@ export class ActionsService {
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
-  }
+   }
 
-  async mintCollectionNFT(
+   async mintCollectionNFT(
     walletKeypair: Keypair,
-    collectionAddress: string,
-    metadata: NFTMetadata,
-    recipientAddress?: string
-  ): Promise<MintCollectionNFTResponse> {
+    options: MintNFTOptions
+   ): Promise<MintCollectionNFTResponse> {
     try {
       // Validate inputs
-      if (!metadata.name || !metadata.uri) {
+      if (!options.metadata.name || !options.metadata.uri) {
         throw new HttpException(
           'Name and URI are required in metadata',
           HttpStatus.BAD_REQUEST
         );
       }
-  
+   
       // Validate collection address
       let collectionMint: PublicKey;
       try {
-        collectionMint = new PublicKey(collectionAddress);
+        collectionMint = new PublicKey(options.collectionAddress);
       } catch {
         throw new HttpException(
           'Invalid collection address',
           HttpStatus.BAD_REQUEST
         );
       }
-  
+   
       // Validate recipient address if provided
       let recipient: PublicKey | undefined;
-      if (recipientAddress) {
+      if (options.recipientAddress) {
         try {
-          recipient = new PublicKey(recipientAddress);
+          recipient = new PublicKey(options.recipientAddress);
         } catch {
           throw new HttpException(
             'Invalid recipient address',
@@ -720,10 +798,13 @@ export class ActionsService {
           );
         }
       }
-  
+   
       // Validate creator shares if provided
-      if (metadata.creators) {
-        const totalShares = metadata.creators.reduce((sum, creator) => sum + creator.share, 0);
+      if (options.metadata.creators) {
+        const totalShares = options.metadata.creators.reduce(
+          (sum, creator) => sum + creator.share, 
+          0
+        );
         if (totalShares !== 100) {
           throw new HttpException(
             'Creator shares must sum to 100',
@@ -731,34 +812,47 @@ export class ActionsService {
           );
         }
       }
-  
-      // Initialize Umi
-      const umi = createUmi(this.heliusUrl).use(mplCore());
+   
+      // Get RPC URL and initialize Umi
+      const rpcUrl = await this.getRpcUrl(walletKeypair, options.network);
+      const umi = createUmi(rpcUrl).use(mplCore());
       umi.use(keypairIdentity(fromWeb3JsKeypair(walletKeypair)));
-  
+   
       // Convert collection mint to UMI format
       const umiCollectionMint = fromWeb3JsPublicKey(collectionMint);
-  
+   
       // Fetch the collection
       const collection = await fetchCollection(umi, umiCollectionMint);
-  
+   
       // Generate new NFT signer
       const assetSigner = generateSigner(umi);
-  
+   
       // Create the NFT
       await create(umi, {
         asset: assetSigner,
         collection: collection,
-        name: metadata.name,
-        uri: metadata.uri,
+        name: options.metadata.name,
+        uri: options.metadata.uri,
         owner: fromWeb3JsPublicKey(recipient ?? walletKeypair.publicKey),
       }).sendAndConfirm(umi);
-  
+   
       return {
         mint: toWeb3JsPublicKey(assetSigner.publicKey),
         metadata: toWeb3JsPublicKey(assetSigner.publicKey),
       };
     } catch (error) {
+      console.error('NFT Minting Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        collection: options.collectionAddress,
+        network: options.network || 'auto-detect',
+        metadata: {
+          name: options.metadata.name,
+          uri: options.metadata.uri
+        }
+      });
+   
       if (error instanceof HttpException) {
         throw error;
       }
@@ -767,7 +861,7 @@ export class ActionsService {
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
-  }
+   }
 
   async requestFaucetFunds(
     walletKeypair: Keypair,
@@ -847,30 +941,53 @@ export class ActionsService {
   
   async getTokenDetailedReport(mint: string): Promise<TokenCheck> {
     try {
+      // Log the mint address we're checking
+      console.log('Checking token mint:', mint);
+  
       // Validate mint address format
       try {
         new PublicKey(mint);
-      } catch {
+      } catch (error) {
+        console.error('Invalid mint address:', error);
         throw new HttpException(
           'Invalid mint address format',
           HttpStatus.BAD_REQUEST
         );
       }
   
-      const response = await fetch(`${this.RUGCHECK_BASE_URL}/tokens/${mint}/report`);
+      const url = `${this.RUGCHECK_BASE_URL}/tokens/${mint}/report`;
+      console.log('Making request to:', url);
+  
+      const response = await fetch(url);
+      
+      console.log('RugCheck API response status:', response.status);
       
       if (!response.ok) {
+        // Get the error message from the response if possible
+        const errorText = await response.text();
+        console.error('RugCheck API error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+  
         throw new HttpException(
-          `RugCheck API error: ${response.status}`,
+          `RugCheck API error: ${response.status} - ${errorText}`,
           HttpStatus.BAD_GATEWAY
         );
       }
   
-      return await response.json();
+      const data = await response.json();
+      console.log('Successfully got token report');
+      return data;
+  
     } catch (error) {
+      console.error('Full error details:', error);
+      
       if (error instanceof HttpException) {
         throw error;
       }
+      
       throw new HttpException(
         `Failed to fetch detailed token report: ${error instanceof Error ? error.message : 'Unknown error'}`,
         HttpStatus.INTERNAL_SERVER_ERROR
@@ -895,17 +1012,23 @@ export class ActionsService {
   
   private async processAirdropBatches(
     walletKeypair: Keypair,
-    amount: number,
-    mintAddress: PublicKey,
-    recipients: PublicKey[],
-    priorityFeeInLamports: number,
-    shouldLog: boolean,
-    connection: Connection
+    options: {
+      amount: number;
+      mintAddress: PublicKey;
+      recipients: PublicKey[];
+      priorityFeeInLamports: number;
+      shouldLog: boolean;
+      network?: 'mainnet' | 'devnet';
+    }
   ): Promise<string[]> {
+    // Create connection using our helper
+    const connection = await this.createConnection(walletKeypair, { network: options.network });
+  
+    // Get source token account
     const sourceTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       walletKeypair,
-      mintAddress,
+      options.mintAddress,
       walletKeypair.publicKey,
     );
   
@@ -916,17 +1039,19 @@ export class ActionsService {
       await connection.getAddressLookupTable(this.LOOKUP_TABLE_ADDRESS)
     ).value!;
   
+    // Create batches
     const batches: PublicKey[][] = [];
-    for (let i = 0; i < recipients.length; i += maxRecipientsPerInstruction * maxIxs) {
-      batches.push(recipients.slice(i, i + maxRecipientsPerInstruction * maxIxs));
+    for (let i = 0; i < options.recipients.length; i += maxRecipientsPerInstruction * maxIxs) {
+      batches.push(options.recipients.slice(i, i + maxRecipientsPerInstruction * maxIxs));
     }
   
+    // Process instruction sets
     const instructionSets = await Promise.all(
       batches.map(async (recipientBatch) => {
         const instructions: TransactionInstruction[] = [
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: calculateComputeUnitPrice(priorityFeeInLamports, 500_000),
+            microLamports: calculateComputeUnitPrice(options.priorityFeeInLamports, 500_000),
           }),
         ];
   
@@ -939,8 +1064,8 @@ export class ActionsService {
               owner: walletKeypair.publicKey,
               source: sourceTokenAccount.address,
               toAddress: batch,
-              amount: batch.map(() => amount),
-              mint: mintAddress,
+              amount: batch.map(() => options.amount),
+              mint: options.mintAddress,
             }),
           );
         }
@@ -950,12 +1075,15 @@ export class ActionsService {
       }),
     );
   
-    const rpc = createRpc(this.heliusUrl, this.heliusUrl, this.heliusUrl);
+    // Create RPC with the correct network URL
+    const rpcUrl = await this.getRpcUrl(walletKeypair, options.network);
+    const rpc = createRpc(rpcUrl, rpcUrl, rpcUrl);
   
     const results = [];
     let confirmedCount = 0;
     const totalBatches = instructionSets.length;
   
+    // Process batches
     for (let i = 0; i < instructionSets.length; i += this.MAX_CONCURRENT_TXS) {
       const batchPromises = instructionSets
         .slice(i, i + this.MAX_CONCURRENT_TXS)
@@ -966,9 +1094,10 @@ export class ActionsService {
             walletKeypair,
             lookupTableAccount,
             i + idx,
+            options.network
           ).then((signature) => {
             confirmedCount++;
-            if (shouldLog) {
+            if (options.shouldLog) {
               console.log(`Processed batch ${confirmedCount}/${totalBatches}`);
             }
             return signature;
@@ -979,6 +1108,7 @@ export class ActionsService {
       results.push(...batchResults);
     }
   
+    // Handle failures
     const failures = results
       .filter((r) => r.status === 'rejected')
       .map((r, idx) => ({
@@ -987,6 +1117,14 @@ export class ActionsService {
       }));
   
     if (failures.length > 0) {
+      console.error('Airdrop Batch Processing Error:', {
+        failures,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        totalBatches,
+        failedBatches: failures.length
+      });
+  
       throw new HttpException(
         `Failed to process ${failures.length} batches: ${failures.map((f) => f.error).join(', ')}`,
         HttpStatus.INTERNAL_SERVER_ERROR
@@ -1002,6 +1140,7 @@ export class ActionsService {
     payer: Keypair,
     lookupTableAccount: AddressLookupTableAccount,
     batchIndex: number,
+    network?: 'mainnet' | 'devnet'
   ): Promise<string> {
     const MAX_RETRIES = 3;
     const INITIAL_BACKOFF = 500;
@@ -1019,6 +1158,15 @@ export class ActionsService {
   
         return await sendAndConfirmTx(connection, tx);
       } catch (error) {
+        console.error('Transaction Retry Error:', {
+          error,
+          message: error.message,
+          attempt: attempt + 1,
+          batchIndex,
+          network: network || 'auto-detect',
+          wallet: payer.publicKey.toString()
+        });
+  
         const isRetryable =
           error instanceof Error &&
           (error.message?.includes('blockhash not found') ||
@@ -1056,7 +1204,8 @@ export class ActionsService {
         );
       }
   
-      const connection = new Connection(this.heliusUrl, 'confirmed');
+      // Use createConnection helper for network selection
+      const connection = await this.createConnection(walletKeypair, options);
   
       // Create token pool if needed
       try {
@@ -1067,22 +1216,40 @@ export class ActionsService {
         );
       } catch (error: any) {
         if (!error.message?.includes('already in use')) {
+          console.error('Token Pool Creation Error:', {
+            error,
+            message: error.message,
+            wallet: walletKeypair.publicKey.toString(),
+            network: options.network || 'auto-detect',
+            mintAddress: mintAddress.toString()
+          });
           throw error;
         }
       }
   
       const signatures = await this.processAirdropBatches(
         walletKeypair,
-        options.amount * Math.pow(10, options.decimals),
-        mintAddress,
-        recipients,
-        options.priorityFeeInLamports,
-        options.shouldLog || false,
-        connection
+        {
+          amount: options.amount * Math.pow(10, options.decimals),
+          mintAddress,
+          recipients,
+          priorityFeeInLamports: options.priorityFeeInLamports,
+          shouldLog: options.shouldLog || false,
+          network: options.network
+        }
       );
   
       return { signatures };
     } catch (error) {
+      console.error('Compressed Airdrop Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        mintAddress: options.mintAddress,
+        recipientCount: options.recipients.length
+      });
+  
       if (error instanceof HttpException) {
         throw error;
       }
@@ -1095,9 +1262,10 @@ export class ActionsService {
 
   private async executeStakeTransaction(
     walletKeypair: Keypair,
-    transactionData: string
+    transactionData: string,
+    options?: BaseOptions
   ): Promise<string> {
-    const connection = new Connection(this.heliusUrl, 'confirmed');
+    const connection = await this.createConnection(walletKeypair, options);
   
     try {
       // Deserialize transaction
@@ -1146,10 +1314,10 @@ export class ActionsService {
   
   async stakeWithJup(
     walletKeypair: Keypair,
-    amount: number
+    options: StakeOptions,
   ): Promise<StakeResponse> {
     try {
-      if (!amount || amount <= 0) {
+      if (!options.amount || options.amount <= 0) {
         throw new HttpException(
           'Amount must be greater than 0',
           HttpStatus.BAD_REQUEST
@@ -1157,7 +1325,7 @@ export class ActionsService {
       }
   
       const response = await fetch(
-        `https://worker.jup.ag/blinks/swap/So11111111111111111111111111111111111111112/jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v/${amount}`,
+        `https://worker.jup.ag/blinks/swap/So11111111111111111111111111111111111111112/jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v/${options.amount}`,
         {
           method: 'POST',
           headers: {
@@ -1179,7 +1347,8 @@ export class ActionsService {
       const data = await response.json();
       const signature = await this.executeStakeTransaction(
         walletKeypair,
-        data.transaction
+        data.transaction,
+        options
       );
   
       return { signature };
@@ -1196,10 +1365,10 @@ export class ActionsService {
   
   async stakeWithSolayer(
     walletKeypair: Keypair,
-    amount: number
+    options: StakeOptions,
   ): Promise<StakeResponse> {
     try {
-      if (!amount || amount <= 0) {
+      if (!options.amount || options.amount <= 0) {
         throw new HttpException(
           'Amount must be greater than 0',
           HttpStatus.BAD_REQUEST
@@ -1207,7 +1376,7 @@ export class ActionsService {
       }
   
       const response = await fetch(
-        `https://app.solayer.org/api/action/restake/ssol?amount=${amount}`,
+        `https://app.solayer.org/api/action/restake/ssol?amount=${options.amount}`,
         {
           method: 'POST',
           headers: {
@@ -1230,7 +1399,8 @@ export class ActionsService {
       const data = await response.json();
       const signature = await this.executeStakeTransaction(
         walletKeypair,
-        data.transaction
+        data.transaction,
+        options
       );
   
       return { signature };
@@ -1248,12 +1418,11 @@ export class ActionsService {
   // Add to actions.service.ts
   async listNFTForSale(
     walletKeypair: Keypair,
-    nftMint: string,
-    price: number
+    options: NFTListingOptions
   ): Promise<NFTListingResponse> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
-      const mintPubkey = new PublicKey(nftMint);
+      const connection = await this.createConnection(walletKeypair, options);
+      const mintPubkey = new PublicKey(options.nftMint);
   
       // Validate NFT mint
       if (!PublicKey.isOnCurve(mintPubkey)) {
@@ -1266,7 +1435,7 @@ export class ActionsService {
       const mintInfo = await connection.getAccountInfo(mintPubkey);
       if (!mintInfo) {
         throw new HttpException(
-          `NFT mint ${nftMint} does not exist`,
+          `NFT mint ${options.nftMint} does not exist`,
           HttpStatus.NOT_FOUND
         );
       }
@@ -1277,13 +1446,13 @@ export class ActionsService {
         const tokenAccount = await getAccount(connection, ata);
         if (!tokenAccount || tokenAccount.amount <= 0) {
           throw new HttpException(
-            `You don't own this NFT (${nftMint})`,
+            `You don't own this NFT (${options.nftMint})`,
             HttpStatus.BAD_REQUEST
           );
         }
       } catch (error) {
         throw new HttpException(
-          `No token account found for mint ${nftMint}`,
+          `No token account found for mint ${options.nftMint}`,
           HttpStatus.NOT_FOUND
         );
       }
@@ -1297,7 +1466,7 @@ export class ActionsService {
       const tensorSwapSdk = new TensorSwapSDK({ provider });
   
       // Setup listing
-      const priceInLamports = new BN(price * 1e9);
+      const priceInLamports = new BN(options.price * 1e9);
       const nftSource = await getAssociatedTokenAddress(
         mintPubkey,
         walletKeypair.publicKey
@@ -1335,11 +1504,11 @@ export class ActionsService {
   
   async cancelNFTListing(
     walletKeypair: Keypair,
-    nftMint: string
+    options: { nftMint: string } & BaseOptions
   ): Promise<NFTListingResponse> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
-      const mintPubkey = new PublicKey(nftMint);
+      const connection = await this.createConnection(walletKeypair, options);
+      const mintPubkey = new PublicKey(options.nftMint);
   
       const provider = new AnchorProvider(
         connection,
@@ -1385,15 +1554,12 @@ export class ActionsService {
   
   async tradeTokens(
     walletKeypair: Keypair,
-    outputMint: string,
-    inputAmount: number,
-    inputMint?: string,
-    slippageBps: number = this.DEFAULT_OPTIONS.SLIPPAGE_BPS
+    options: TradeOptions
   ): Promise<TradeResponse> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
-      const outputMintPubkey = new PublicKey(outputMint);
-      const inputMintPubkey = inputMint ? new PublicKey(inputMint) : this.TOKENS.USDC;
+      const connection = await this.createConnection(walletKeypair, options);
+      const outputMintPubkey = new PublicKey(options.outputMint);
+      const inputMintPubkey = options.inputMint ? new PublicKey(options.inputMint) : this.TOKENS.USDC;
   
       // Check if input token is native SOL
       const isNativeSol = inputMintPubkey.equals(this.TOKENS.SOL);
@@ -1402,7 +1568,7 @@ export class ActionsService {
         : (await getMint(connection, inputMintPubkey)).decimals;
   
       // Calculate scaled amount
-      const scaledAmount = inputAmount * Math.pow(10, inputDecimals);
+      const scaledAmount = options.inputAmount * Math.pow(10, inputDecimals);
   
       // Get quote
       const quoteResponse = await (
@@ -1411,7 +1577,7 @@ export class ActionsService {
           `inputMint=${isNativeSol ? this.TOKENS.SOL.toString() : inputMintPubkey.toString()}` +
           `&outputMint=${outputMintPubkey.toString()}` +
           `&amount=${scaledAmount}` +
-          `&slippageBps=${slippageBps}` +
+          `&slippageBps=${options.slippageBps || this.DEFAULT_OPTIONS.SLIPPAGE_BPS}` +
           '&onlyDirectRoutes=true' +
           '&maxAccounts=20'
         )
@@ -1443,6 +1609,14 @@ export class ActionsService {
   
       return { signature };
     } catch (error) {
+      console.error('Trade Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        outputMint: options.outputMint
+      });
+  
       if (error instanceof HttpException) {
         throw error;
       }
@@ -1455,23 +1629,21 @@ export class ActionsService {
   
   async transferTokens(
     walletKeypair: Keypair,
-    recipient: string,
-    amount: number,
-    mintAddress?: string
+    options: TransferOptions
   ): Promise<TransferResponse> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
-      const recipientPubkey = new PublicKey(recipient);
+      const connection = await this.createConnection(walletKeypair, options);
+      const recipientPubkey = new PublicKey(options.recipient);
   
       let signature: string;
   
-      if (!mintAddress) {
+      if (!options.mintAddress) {
         // Transfer native SOL
         const transaction = new Transaction().add(
           SystemProgram.transfer({
             fromPubkey: walletKeypair.publicKey,
             toPubkey: recipientPubkey,
-            lamports: amount * LAMPORTS_PER_SOL,
+            lamports: options.amount * LAMPORTS_PER_SOL,
           })
         );
   
@@ -1481,7 +1653,7 @@ export class ActionsService {
         );
       } else {
         // Transfer SPL token
-        const mintPubkey = new PublicKey(mintAddress);
+        const mintPubkey = new PublicKey(options.mintAddress);
         const fromAta = await getAssociatedTokenAddress(
           mintPubkey,
           walletKeypair.publicKey
@@ -1493,7 +1665,7 @@ export class ActionsService {
   
         // Get decimals and adjust amount
         const mintInfo = await getMint(connection, mintPubkey);
-        const adjustedAmount = amount * Math.pow(10, mintInfo.decimals);
+        const adjustedAmount = options.amount * Math.pow(10, mintInfo.decimals);
   
         const transaction = new Transaction().add(
           createTransferInstruction(
@@ -1512,6 +1684,15 @@ export class ActionsService {
   
       return { signature };
     } catch (error) {
+      console.error('Transfer Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        recipient: options.recipient,
+        mintAddress: options.mintAddress || 'SOL'
+      });
+  
       if (error instanceof HttpException) {
         throw error;
       }
@@ -1525,7 +1706,8 @@ export class ActionsService {
   private async processRPSOutcome(
     walletKeypair: Keypair,
     signature: string,
-    href: string
+    href: string,
+    options?: BaseOptions
   ): Promise<string> {
     const res = await fetch(
       'https://rps.sendarcade.fun' + href,
@@ -1549,14 +1731,14 @@ export class ActionsService {
     }
   
     const nextHref = data.links?.actions?.[0]?.href;
-    return title + '\n' + (await this.processWin(walletKeypair, nextHref));
+    return title + '\n' + (await this.processWin(walletKeypair, nextHref, options));
   }
   
   private async processWin(
     walletKeypair: Keypair,
-    href: string
+    href: string,
+    options?: BaseOptions
   ): Promise<string> {
-    // Process win transaction
     const res = await fetch(
       'https://rps.sendarcade.fun' + href,
       {
@@ -1572,7 +1754,7 @@ export class ActionsService {
   
     const data = await res.json();
     if (data.transaction) {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
+      const connection = await this.createConnection(walletKeypair, options);
       const txn = Transaction.from(Buffer.from(data.transaction, 'base64'));
       txn.partialSign(walletKeypair);
       await connection.sendRawTransaction(txn.serialize(), {
@@ -1581,12 +1763,13 @@ export class ActionsService {
     }
   
     const nextHref = data.links?.next?.href;
-    return await this.processPostWin(walletKeypair, nextHref);
+    return await this.processPostWin(walletKeypair, nextHref, options);
   }
   
   private async processPostWin(
     walletKeypair: Keypair,
-    href: string
+    href: string,
+    options?: BaseOptions
   ): Promise<string> {
     const res = await fetch(
       'https://rps.sendarcade.fun' + href,
@@ -1607,14 +1790,13 @@ export class ActionsService {
   
   async playRockPaperScissors(
     walletKeypair: Keypair,
-    amount: number,
-    choice: 'rock' | 'paper' | 'scissors'
+    options: RPSGameOptions
   ): Promise<RPSGameResponse> {
     try {
-      const connection = new Connection(this.heliusUrl, 'confirmed');
+      const connection = await this.createConnection(walletKeypair, options);
   
       const res = await fetch(
-        `https://rps.sendarcade.fun/api/actions/bot?amount=${amount}&choice=${choice}`,
+        `https://rps.sendarcade.fun/api/actions/bot?amount=${options.amount}&choice=${options.choice}`,
         {
           method: 'POST',
           headers: {
@@ -1648,10 +1830,18 @@ export class ActionsService {
       );
   
       const href = data.links?.next?.href;
-      const outcome = await this.processRPSOutcome(walletKeypair, signature, href);
+      const outcome = await this.processRPSOutcome(walletKeypair, signature, href, options);
   
       return { outcome };
     } catch (error) {
+      console.error('RPS Game Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        choice: options.choice
+      });
+  
       throw new HttpException(
         `RPS game failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         HttpStatus.INTERNAL_SERVER_ERROR
