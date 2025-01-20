@@ -76,7 +76,6 @@ export class ChatService {
   }
 
   async addMessage(
-    userId: string, 
     threadId: string, 
     content: string, 
     role: 'user' | 'assistant'
@@ -84,7 +83,6 @@ export class ChatService {
     const message = new this.messageModel({
       content,
       role,
-      userId,
       timestamp: new Date(),
       reactions: []
     });
@@ -92,7 +90,7 @@ export class ChatService {
     const savedMessage = await message.save();
 
     const updatedConversation = await this.conversationModel.findOneAndUpdate(
-      { userId, threadId },
+      { threadId },
       {
         $push: { messages: savedMessage },
         $set: { 

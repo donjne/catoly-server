@@ -70,13 +70,11 @@ export class ChatController {
 
   @Post('conversations/:threadId/messages')
   async sendMessage(
-    @GetUser() user: any,
     @Param('threadId') threadId: string,
     @Body() body: { content: string }
   ) {
     try {
       await this.chatService.addMessage(
-        user.sub,
         threadId,
         body.content,
         'user'
@@ -87,7 +85,6 @@ export class ChatController {
 
       // Add AI response
       return await this.chatService.addMessage(
-        user.sub,
         threadId,
         aiResponse,
         'assistant'
