@@ -65,7 +65,7 @@ export class Conversation {
 const MessageSchema = SchemaFactory.createForClass(Message);
 const ConversationSchema = SchemaFactory.createForClass(Conversation);
 
-// Just keep the userId index
+
 ConversationSchema.index({ userId: 1 });
 
 export { MessageSchema, ConversationSchema };
