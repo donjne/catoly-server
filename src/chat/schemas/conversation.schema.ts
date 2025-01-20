@@ -5,12 +5,6 @@ import { Document, Types } from 'mongoose';
 export type MessageDocument = Message & Document;
 export type ConversationDocument = Conversation & Document;
 
-interface Reaction {
-  emoji: string;
-  count: number;
-  users: string[];
-}
-
 @Schema()
 class ReactionSchema {
   @Prop({ required: true })
@@ -25,7 +19,7 @@ class ReactionSchema {
 
 @Schema({ timestamps: true })
 export class Message {
-  @Prop({ type: Types.ObjectId, auto: true })
+  @Prop({ type: Types.ObjectId })
   _id: Types.ObjectId;
 
   @Prop({ required: true })
@@ -34,7 +28,7 @@ export class Message {
   @Prop({ required: true, enum: ['user', 'assistant'] })
   role: 'user' | 'assistant';
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   userId: string;
 
   @Prop({ default: Date.now })
@@ -44,24 +38,21 @@ export class Message {
   editedAt?: Date;
 
   @Prop({ type: [ReactionSchema], default: [] })
-  reactions: Reaction[];
+  reactions: ReactionSchema[];
 }
 
 @Schema({ timestamps: true })
 export class Conversation {
-  @Prop({ type: Types.ObjectId, auto: true })
-  _id: Types.ObjectId;
-
   @Prop({ required: true })
-  userId: string;  // Privy user ID
+  userId: string;
 
-  @Prop({ required: true })
-  threadId: string;  // AI thread ID
+  @Prop({ required: true, unique: true, type: Number })  
+  threadId: number;
 
   @Prop({ default: true })
   isActive: boolean;
 
-  @Prop({ type: [Message] })
+  @Prop({ type: [{ type: Message }], default: [] })
   messages: Message[];
 
   @Prop()
@@ -71,5 +62,10 @@ export class Conversation {
   lastMessageAt: Date;
 }
 
-export const MessageSchema = SchemaFactory.createForClass(Message);
-export const ConversationSchema = SchemaFactory.createForClass(Conversation);
+const MessageSchema = SchemaFactory.createForClass(Message);
+const ConversationSchema = SchemaFactory.createForClass(Conversation);
+
+
+ConversationSchema.index({ userId: 1 });
+
+export { MessageSchema, ConversationSchema };

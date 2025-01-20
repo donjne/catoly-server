@@ -8,6 +8,7 @@ import {
   Message,
   MessageDocument 
 } from './schemas/conversation.schema';
+import axios from 'axios';
 
 @Injectable()
 export class ChatService {
@@ -80,19 +81,19 @@ export class ChatService {
     content: string, 
     role: 'user' | 'assistant'
   ) {
-    const message = new this.messageModel({
+   
+    const message = {
       content,
       role,
       timestamp: new Date(),
       reactions: []
-    });
-
-    const savedMessage = await message.save();
-
+    };
+  
+    
     const updatedConversation = await this.conversationModel.findOneAndUpdate(
       { threadId },
       {
-        $push: { messages: savedMessage },
+        $push: { messages: message },
         $set: { 
           lastMessage: content,
           lastMessageAt: new Date()
@@ -100,37 +101,67 @@ export class ChatService {
       },
       { new: true }
     );
-
+  
     if (!updatedConversation) {
       throw new NotFoundException('Conversation not found');
     }
-
+  
     return updatedConversation;
   }
-
-  private async createAIThread(): Promise<string> {
+  private lastThreadId = 0;
+  private async createAIThread(): Promise<number> {
     try {
-      const response = await fetch('http://52.26.233.41/agent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          question: "Start a new conversation",
-          thread_id: 0
-        })
+      const response = await axios.post('http://52.26.233.41/agent', {
+        question: "Start a new conversation",
+        thread_id: 0
       });
-
-      if (!response.ok) {
-        throw new Error('AI service response was not ok');
-      }
-
-      const data = await response.json();
-      return data.threadId;
+  
+      this.lastThreadId += 1;
+    
+      console.log('Generated threadId:', this.lastThreadId);
+      return this.lastThreadId;
     } catch (error) {
       throw new Error(`Failed to create AI thread: ${error.message}`);
     }
   }
+  
+ 
+  async getAIResponse(threadId: string, question: string) {
+    try {
+      const response = await axios.post('http://52.26.233.41/agent', {
+        question,
+        thread_id: threadId
+      });
+  
+      return response.data.result[1].TransactionExplorer.messages[0].content;
+    } catch (error) {
+      throw new Error(`Failed to get AI response: ${error.message}`);
+    }
+  }
+
+  // private async createAIThread(): Promise<string> {
+  //   try {
+  //     const response = await fetch('http://52.26.233.41/agent', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({
+  //         question: "Start a new conversation",
+  //         thread_id: 0
+  //       })
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error('AI service response was not ok');
+  //     }
+
+  //     const data = await response.json();
+  //     return data.threadId;
+  //   } catch (error) {
+  //     throw new Error(`Failed to create AI thread: ${error.message}`);
+  //   }
+  // }
 
   async switchThread(userId: string, threadId: string) {
     await this.conversationModel.updateMany(
@@ -151,29 +182,29 @@ export class ChatService {
     return conversation;
   }
 
-  async getAIResponse(threadId: string, question: string) {
-    try {
-      const response = await fetch('http://52.26.233.41/agent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          question,
-          thread_id: threadId
-        })
-      });
+  // async getAIResponse(threadId: string, question: string) {
+  //   try {
+  //     const response = await fetch('http://52.26.233.41/agent', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({
+  //         question,
+  //         thread_id: threadId
+  //       })
+  //     });
 
-      if (!response.ok) {
-        throw new Error('AI service response was not ok');
-      }
+  //     if (!response.ok) {
+  //       throw new Error('AI service response was not ok');
+  //     }
 
-      const data = await response.json();
-      return data.result[1].TransactionExplorer.messages[0].content;
-    } catch (error) {
-      throw new Error(`Failed to get AI response: ${error.message}`);
-    }
-  }
+  //     const data = await response.json();
+  //     return data.result[1].TransactionExplorer.messages[0].content;
+  //   } catch (error) {
+  //     throw new Error(`Failed to get AI response: ${error.message}`);
+  //   }
+  // }
 
   async deleteMessage(messageId: string, userId: string) {
     const message = await this.messageModel.findById(messageId);
