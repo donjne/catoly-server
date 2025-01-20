@@ -66,7 +66,6 @@ export class ChatController {
     @Body() body: { content: string }
   ) {
     try {
-      // Add user message
       await this.chatService.addMessage(
         user.sub,
         threadId,
