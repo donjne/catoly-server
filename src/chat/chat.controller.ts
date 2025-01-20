@@ -19,14 +19,13 @@ import { PrivyAuthGuard } from '../auth/privy.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
 @Controller('chat')
-@UseGuards(PrivyAuthGuard)
 export class ChatController {
   constructor(private chatService: ChatService) {}
 
   @Post('conversations')
-  async createConversation(@GetUser() user: any) {
+  async createConversation() {
     try {
-      return await this.chatService.createConversation(user.sub);
+      return await this.chatService.createConversation('test-user');
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to create conversation',
@@ -74,11 +73,11 @@ export class ChatController {
     @Body() body: { content: string }
   ) {
     try {
-      await this.chatService.addMessage(
-        threadId,
-        body.content,
-        'user'
-      );
+    //   await this.chatService.addMessage(
+    //     threadId,
+    //     body.content,
+    //     'user'
+    //   );
 
       // Get AI response
       const aiResponse = await this.chatService.getAIResponse(threadId, body.content);

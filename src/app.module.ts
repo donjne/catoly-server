@@ -27,9 +27,11 @@ import { MongooseModule } from '@nestjs/mongoose';
     }]),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI'),
-      }),
+      useFactory: (configService: ConfigService) => {
+        const uri = configService.get<string>('MONGODB_URI');
+        console.log('Attempting to connect to MongoDB at:', uri);
+        return { uri };
+      },
       inject: [ConfigService],
     }),
     GeckoModule,
