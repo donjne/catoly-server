@@ -366,7 +366,7 @@ export class DasService {
       }
 
       // Request a larger limit to account for filtering
-      const requestLimit = Math.min(1000, limit * 2);
+      const requestLimit = Math.min(100, limit * 2);
       const validatedPage = Math.max(1, Math.floor(Number(page)));
       const rpcUrl = await this.getRpcUrl(ownerAddress, params.network);
       const response = await fetch(rpcUrl, {
@@ -438,39 +438,38 @@ export class DasService {
     }
   }
 
-  async getWalletPortfolioValue(
-    params: GetWalletPortfolioParams
-  ): Promise<PortfolioValue> {
+  async getWalletPortfolioValue(params: GetWalletPortfolioParams): Promise<PortfolioValue> {
     try {
-      // Get all fungible tokens
-      const response = await this.getFungibleTokensByOwner({
-        ownerAddress: params.ownerAddress,
-        limit: 1000,
-        network: params.network
-      });
+      let totalValue = 0;
+      let allTokens = [];
+      let page = 1;
+      const limit = 100;
+      
+      while (true) {
+        const response = await this.getFungibleTokensByOwner({
+          ownerAddress: params.ownerAddress,
+          limit,
+          page,
+          network: params.network
+        });
   
-      // Calculate values for all tokens using reduce for optimal performance
-      const { totalValue, tokens } = response.items.reduce(
-        (acc, asset) => {
-          if (asset.interface !== 'FungibleToken') return acc;
+        const tokens = response.items
+          .filter(asset => asset.interface === 'FungibleToken')
+          .map(asset => this.calculateTokenValue(asset))
+          .filter(Boolean);
   
-          const tokenValue = this.calculateTokenValue(asset);
-          if (!tokenValue) return acc;
+        if (tokens.length === 0) break;
   
-          return {
-            totalValue: acc.totalValue + tokenValue.value,
-            tokens: [...acc.tokens, tokenValue],
-          };
-        },
-        {
-          totalValue: 0,
-          tokens: [] as Array<ReturnType<typeof this.calculateTokenValue>>,
-        },
-      );
+        allTokens = [...allTokens, ...tokens];
+        totalValue += tokens.reduce((sum, token) => sum + token!.value, 0);
+        
+        if (tokens.length < limit) break;
+        page++;
+      }
   
       return {
         totalValue: Number(totalValue.toFixed(2)),
-        tokens: tokens.filter(Boolean).sort((a, b) => b!.value - a!.value),
+        tokens: allTokens.sort((a, b) => b!.value - a!.value),
       };
     } catch (error) {
       throw new HttpException(error, HttpStatus.INTERNAL_SERVER_ERROR);
