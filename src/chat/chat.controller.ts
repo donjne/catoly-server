@@ -9,7 +9,10 @@ import {
   Delete, 
   Put,
   HttpException,
-  HttpStatus 
+  HttpStatus, 
+  DefaultValuePipe,
+  Query,
+  ParseIntPipe
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { PrivyAuthGuard } from '../auth/privy.guard';
@@ -33,9 +36,13 @@ export class ChatController {
   }
 
   @Get('conversations')
-  async getConversations(@GetUser() user: any) {
+  async getConversations(
+    @GetUser() user: any,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
+  ) {
     try {
-      return await this.chatService.getConversations(user.sub);
+      return await this.chatService.getConversations(user.sub, page, limit);
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to get conversations',
@@ -47,10 +54,12 @@ export class ChatController {
   @Get('conversations/:threadId')
   async getConversation(
     @GetUser() user: any,
-    @Param('threadId') threadId: string
+    @Param('threadId') threadId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     try {
-      return await this.chatService.getConversation(user.sub, threadId);
+      return await this.chatService.getConversation(user.sub, threadId, page, limit);
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to get conversation',

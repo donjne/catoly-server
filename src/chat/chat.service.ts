@@ -37,27 +37,42 @@ export class ChatService {
     }
   }
 
-  async getConversations(userId: string) {
+  async getConversations(userId: string, page = 1, limit = 20) {
     try {
       return this.conversationModel
         .find({ userId })
         .sort({ lastMessageAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
         .exec();
     } catch (error) {
       throw new Error(`Failed to get conversations: ${error.message}`);
     }
   }
 
-  async getConversation(userId: string, threadId: string) {
+  async getConversation(userId: string, threadId: string, page = 1, limit = 20) {
     const conversation = await this.conversationModel
       .findOne({ userId, threadId })
       .exec();
-
+  
     if (!conversation) {
       throw new NotFoundException('Conversation not found');
     }
-
-    return conversation;
+  
+    // Calculate skip for pagination
+    const skip = (page - 1) * limit;
+    
+    // Get paginated messages
+    const messages = conversation.messages
+      .slice(skip, skip + limit)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  
+    return {
+      ...conversation.toObject(),
+      messages,
+      hasMore: skip + limit < conversation.messages.length,
+      total: conversation.messages.length
+    };
   }
 
   async addMessage(
