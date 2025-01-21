@@ -15,7 +15,7 @@ async function bootstrap() {
     
     // Enable CORS
     app.enableCors({
-      origin: ['https://toly-six.vercel.app', 'http://localhost:3000'],
+      origin: ['https://toly-six.vercel.app', 'http://localhost:3000', 'https://toly-lemon.vercel.app'],
       credentials: true,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
       allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
