@@ -20,6 +20,7 @@ import { PrivyAuthGuard } from '../auth/privy.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
 @Controller('chat')
+// @UseGuards(PrivyAuthGuard)
 export class ChatController {
   constructor(private chatService: ChatService) {}
 
@@ -76,8 +77,32 @@ export class ChatController {
   ) {
     try {
       // Let service handle the full flow
-      return await this.chatService.handleMessageFlow(threadId, body.content);
+      // return await this.chatService.handleMessageFlow(threadId, body.content);
+      
+      // await this.chatService.addMessage(
+      //   threadId,
+      //   body.content,
+      //   'user'
+      // );
+
+      // Get AI response
+      const aiResponse = await this.chatService.getAIResponse(threadId, body.content);
+      // console.log(aiResponse);
+      
+
+      // Add AI response
+      // return await this.chatService.addMessage(
+      //   threadId,
+      //   aiResponse,
+      //   'assistant'
+      // );
+
+      return {
+        message: "Successfully queried data",
+        data: aiResponse
+      }
     } catch (error) {
+      console.log(error)
       throw new HttpException(
         error.message || 'Failed to send message',
         HttpStatus.INTERNAL_SERVER_ERROR
