@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  
+
   try {
     const app = await NestFactory.create(AppModule, {
       logger: ['error', 'warn', 'log', 'debug', 'verbose'],
@@ -12,13 +12,13 @@ async function bootstrap() {
 
     // Global exception filter
     app.useGlobalFilters();
-    
+
     // Enable CORS
     app.enableCors({
-      origin: ['*'],
-      credentials: true,
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-      allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+      origin: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: '*',
+      credentials: false,
     });
 
     // Start the application
