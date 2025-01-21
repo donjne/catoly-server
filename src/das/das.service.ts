@@ -50,6 +50,7 @@ import { getAllTld, TldParser } from "@onsol/tldparser";
 // import { ConcurrentMerkleTreeAccount } from '../../node_modules/@solana/spl-account-compression';
 import { getInternalAssetAccountDataSerializer } from '@nifty-oss/asset';
 import { resolve } from '@bonfida/spl-name-service';
+import axios from 'axios';
 
 @Injectable()
 export class DasService {
@@ -369,12 +370,7 @@ export class DasService {
       const requestLimit = Math.min(100, limit * 2);
       const validatedPage = Math.max(1, Math.floor(Number(page)));
       const rpcUrl = await this.getRpcUrl(ownerAddress, params.network);
-      const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await axios.post(rpcUrl, {
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getAssetsByOwner',
@@ -394,24 +390,29 @@ export class DasService {
               showZeroBalance: false,
             },
           },
-        }),
-      });
+      },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-      if (!response.ok) {
-        throw new HttpException(
-          'Failed to fetch fungible tokens from Helius',
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
+      // if (!response.ok) {
+      //   throw new HttpException(
+      //     'Failed to fetch fungible tokens from Helius',
+      //     HttpStatus.BAD_GATEWAY,
+      //   );
+      // }
+      
 
-      const data = (await response.json()) as GetAssetsByOwnerResponse;
+      const data = (await response.data) as GetAssetsByOwnerResponse;
 
-      if ('error' in data) {
-        throw new HttpException(
-          data.error || 'Failed to fetch fungible tokens',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // if ('error' in data) {
+      //   throw new HttpException(
+      //     data.error || 'Failed to fetch fungible tokens',
+      //     HttpStatus.BAD_REQUEST,
+      //   );
+      // }
 
       // Filter to only include FungibleToken interface
       const fungibleTokens = data.result.items.filter(
@@ -497,6 +498,8 @@ export class DasService {
         },
       };
     } catch (error) {
+      console.log(error);
+      
       throw new HttpException(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
