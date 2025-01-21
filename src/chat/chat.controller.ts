@@ -12,7 +12,8 @@ import {
   HttpStatus, 
   DefaultValuePipe,
   Query,
-  ParseIntPipe
+  ParseIntPipe,
+  NotFoundException
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { PrivyAuthGuard } from '../auth/privy.guard';
@@ -25,7 +26,8 @@ export class ChatController {
   @Post('conversations')
   async createConversation() {
     try {
-      return await this.chatService.createConversation('test-user');
+      const randomUserId = `user_${Math.floor(Math.random() * 1000000)}`;
+      return await this.chatService.createConversation(randomUserId);
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to create conversation',
@@ -69,25 +71,12 @@ export class ChatController {
 
   @Post('conversations/:threadId/messages')
   async sendMessage(
-    @Param('threadId') threadId: string,
+    @Param('threadId', ParseIntPipe) threadId: number,  // Parse as number since threadId is numeric
     @Body() body: { content: string }
   ) {
     try {
-    //   await this.chatService.addMessage(
-    //     threadId,
-    //     body.content,
-    //     'user'
-    //   );
-
-      // Get AI response
-      const aiResponse = await this.chatService.getAIResponse(threadId, body.content);
-
-      // Add AI response
-      return await this.chatService.addMessage(
-        threadId,
-        aiResponse,
-        'assistant'
-      );
+      // Let service handle the full flow
+      return await this.chatService.handleMessageFlow(threadId, body.content);
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to send message',
