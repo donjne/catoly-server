@@ -77,19 +77,19 @@ export class ChatService {
   }
 
   async addMessage(
-    threadId: string, 
+    threadId: number, 
     content: string, 
-    role: 'user' | 'assistant'
+    role: 'user' | 'assistant',
+    userId?: string 
   ) {
-   
     const message = {
       content,
       role,
+      userId, 
       timestamp: new Date(),
       reactions: []
     };
   
-    
     const updatedConversation = await this.conversationModel.findOneAndUpdate(
       { threadId },
       {
@@ -108,6 +108,7 @@ export class ChatService {
   
     return updatedConversation;
   }
+
   private lastThreadId = 0;
   private async createAIThread(): Promise<number> {
     try {
@@ -126,7 +127,7 @@ export class ChatService {
   }
   
  
-  async getAIResponse(threadId: string, question: string) {
+  async getAIResponse(threadId: number, question: string) {
     try {
       const response = await axios.post('http://52.26.233.41/agent', {
         question,
@@ -254,7 +255,7 @@ export class ChatService {
       const reaction = message.reactions[reactionIndex];
       const userIndex = reaction.users.indexOf(userId);
       
-      if (userIndex > -1) {
+      if (userIndex > -1) {  
         reaction.users.splice(userIndex, 1);
         reaction.count--;
         if (reaction.count === 0) {
@@ -274,6 +275,37 @@ export class ChatService {
 
     await message.save();
     return message;
+  }
+
+  async handleMessageFlow(threadId: number, content: string) {
+    // 1. Get conversation to verify it exists and get userId
+    const conversation = await this.conversationModel.findOne({ threadId });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+  
+    // 2. Save user message
+    await this.addMessage(
+      threadId,
+      content,
+      'user',
+      conversation.userId
+    );
+  
+    try {
+      // 3. Get AI response
+      const aiResponse = await this.getAIResponse(threadId, content);
+  
+      // 4. Save AI response
+      return await this.addMessage(
+        threadId,
+        aiResponse,
+        'assistant',
+        conversation.userId
+      );
+    } catch (error) {
+      throw new Error(`Failed to process message: ${error.message}`);
+    }
   }
 
   async editMessage(messageId: string, content: string, userId: string) {
