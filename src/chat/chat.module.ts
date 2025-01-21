@@ -10,6 +10,7 @@ import {
   MessageSchema 
 } from './schemas/conversation.schema';
 import { AuthModule } from '../auth/auth.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { AuthModule } from '../auth/auth.module';
       { name: Conversation.name, schema: ConversationSchema },
       { name: Message.name, schema: MessageSchema }
     ]),
-    AuthModule
+    AuthModule,
+    HttpModule
   ],
   controllers: [ChatController],
   providers: [ChatService],

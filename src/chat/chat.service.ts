@@ -8,7 +8,9 @@ import {
   Message,
   MessageDocument 
 } from './schemas/conversation.schema';
-import axios from 'axios';
+import { HttpService } from '@nestjs/axios';
+import { catchError, firstValueFrom, map, Observable } from 'rxjs';
+import axios, { AxiosResponse } from 'axios';
 
 @Injectable()
 export class ChatService {
@@ -16,7 +18,8 @@ export class ChatService {
     @InjectModel(Conversation.name)
     private conversationModel: Model<ConversationDocument>,
     @InjectModel(Message.name)
-    private messageModel: Model<MessageDocument>
+    private messageModel: Model<MessageDocument>,
+    private readonly httpService: HttpService
   ) {}
 
   async createConversation(userId: string): Promise<ConversationDocument> {
@@ -127,18 +130,18 @@ export class ChatService {
   }
   
  
-  async getAIResponse(threadId: number, question: string) {
-    try {
-      const response = await axios.post('http://52.26.233.41/agent', {
-        question,
-        thread_id: threadId
-      });
+  // async getAIResponse(threadId: number, question: string) {
+  //   try {
+  //     const response = await axios.post('http://52.26.233.41/agent', {
+  //       question,
+  //       thread_id: threadId
+  //     });
   
-      return response.data.result[1].TransactionExplorer.messages[0].content;
-    } catch (error) {
-      throw new Error(`Failed to get AI response: ${error.message}`);
-    }
-  }
+  //     return response.data.result[1].TransactionExplorer.messages[0].content;
+  //   } catch (error) {
+  //     throw new Error(`Failed to get AI response: ${error.message}`);
+  //   }
+  // }
 
   // private async createAIThread(): Promise<string> {
   //   try {
@@ -183,29 +186,57 @@ export class ChatService {
     return conversation;
   }
 
-  // async getAIResponse(threadId: string, question: string) {
-  //   try {
-  //     const response = await fetch('http://52.26.233.41/agent', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json'
-  //       },
-  //       body: JSON.stringify({
-  //         question,
-  //         thread_id: threadId
-  //       })
-  //     });
+  async getAIResponse(threadId: number, question: string) {
+    try {
+      // return this.httpService.post('http://52.26.233.41/agent', {
+      // // const response = this.httpService.post('http://52.26.233.41/agent', {
+      //   headers: {
+      //     'Content-Type': 'application/json'
+      //   },
+      //   body: JSON.stringify({
+      //     question,
+      //     thread_id: threadId
+      //   })
+      // })
+      // .pipe(
+      //   map((response: AxiosResponse) => response.data),
+      //   catchError((error) => {
+      //     throw new Error(`Failed to fetch data: ${error.message}`);
+      //   })
+      // )
 
-  //     if (!response.ok) {
-  //       throw new Error('AI service response was not ok');
-  //     }
+      const response = await firstValueFrom(
+        this.httpService.post('http://52.26.233.41/agent', {
+          // const response = this.httpService.post('http://52.26.233.41/agent', {
+            question,
+            thread_id: threadId || 3
+            // body: JSON.stringify({
+            //   // thread_id: threadId
+            // })
+          },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+        })
+          .pipe(
+          map((response: AxiosResponse) => response.data)
+        )
+      );
+      return response;
 
-  //     const data = await response.json();
-  //     return data.result[1].TransactionExplorer.messages[0].content;
-  //   } catch (error) {
-  //     throw new Error(`Failed to get AI response: ${error.message}`);
-  //   }
-  // }
+      // if (!response.ok) {
+      //   throw new Error('AI service response was not ok');
+      // }
+
+      // const data = await response.json();
+      // return data.result[1].TransactionExplorer.messages[0].content;
+    } catch (error) {
+      console.log(error);
+      
+      throw new Error(`Failed to get AI response: ${error.message}`);
+    }
+  }
 
   async deleteMessage(messageId: string, userId: string) {
     const message = await this.messageModel.findById(messageId);

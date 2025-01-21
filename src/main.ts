@@ -22,7 +22,7 @@ async function bootstrap() {
     });
 
     // Start the application
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT || 4600;
     await app.listen(port);
     logger.log(`Application is running on: ${await app.getUrl()}`);
   } catch (error) {
