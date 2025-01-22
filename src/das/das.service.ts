@@ -43,10 +43,10 @@ import {
   GetPortfolioParams,
   GetWalletPortfolioParams,
   GetBalanceParams,
-  GetCompleteBalanceParams
+  GetCompleteBalanceParams,
 } from './das.types';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { getAllTld, TldParser } from "@onsol/tldparser";
+import { getAllTld, TldParser } from '@onsol/tldparser';
 // import { ConcurrentMerkleTreeAccount } from '../../node_modules/@solana/spl-account-compression';
 import { getInternalAssetAccountDataSerializer } from '@nifty-oss/asset';
 import { resolve } from '@bonfida/spl-name-service';
@@ -56,12 +56,15 @@ import axios from 'axios';
 export class DasService {
   private readonly heliusMainnetUrl: string;
   private readonly heliusDevnetUrl: string;
+  private readonly connection: Connection;
   private readonly NETWORK_URLS = {
-    mainnet: "",
-    devnet: ""
+    mainnet: '',
+    devnet: '',
   };
   private readonly SOL_DECIMALS = 9;
-  private readonly VOTE_PROGRAM_ID = new PublicKey('Vote111111111111111111111111111111111111111');
+  private readonly VOTE_PROGRAM_ID = new PublicKey(
+    'Vote111111111111111111111111111111111111111',
+  );
 
   constructor(private configService: ConfigService) {
     const heliusKey = this.configService.get<string>('HELIUS_API_KEY');
@@ -74,11 +77,16 @@ export class DasService {
     this.heliusDevnetUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
     this.NETWORK_URLS.mainnet = this.heliusMainnetUrl;
     this.NETWORK_URLS.devnet = this.heliusDevnetUrl;
+
+    this.connection = new Connection(this.heliusMainnetUrl);
   }
 
-  private async getRpcUrl(address?: string, preferredNetwork?: 'mainnet' | 'devnet'): Promise<string> {
+  private async getRpcUrl(
+    address?: string,
+    preferredNetwork?: 'mainnet' | 'devnet',
+  ): Promise<string> {
     console.log('getRpcUrl called with:', { address, preferredNetwork });
-    
+
     if (preferredNetwork) {
       console.log('Using preferred network:', preferredNetwork);
       return this.NETWORK_URLS[preferredNetwork];
@@ -92,23 +100,25 @@ export class DasService {
     console.log('Detecting network for address:', address);
     const detectedNetwork = await this.detectNetwork(address);
     console.log('Detected network:', detectedNetwork);
-    
+
     return this.NETWORK_URLS[detectedNetwork];
   }
-  
+
   private async detectNetwork(address: string): Promise<'mainnet' | 'devnet'> {
     console.log('detectNetwork called for address:', address);
-    
+
     try {
       const connection = new Connection(this.heliusMainnetUrl);
       console.log('Checking account info on mainnet');
-      const accountInfo = await connection.getAccountInfo(new PublicKey(address));
-      
+      const accountInfo = await connection.getAccountInfo(
+        new PublicKey(address),
+      );
+
       if (accountInfo) {
         console.log('Account found on mainnet');
         return 'mainnet';
       }
-      
+
       console.log('Account not found on mainnet, defaulting to devnet');
       return 'devnet';
     } catch (error) {
@@ -163,7 +173,7 @@ export class DasService {
   }
 
   async getNativeBalance(
-    params: GetBalanceParams
+    params: GetBalanceParams,
   ): Promise<FormattedNativeBalance> {
     try {
       if (!params.ownerAddress) {
@@ -172,7 +182,7 @@ export class DasService {
           HttpStatus.BAD_REQUEST,
         );
       }
-  
+
       const rpcUrl = await this.getRpcUrl(params.ownerAddress, params.network);
       const response = await fetch(rpcUrl, {
         method: 'POST',
@@ -253,7 +263,7 @@ export class DasService {
   async getAsset(params: GetAssetParams) {
     try {
       const rpcUrl = await this.getRpcUrl(undefined, params.network);
-  
+
       const response = await fetch(rpcUrl, {
         method: 'POST',
         headers: {
@@ -300,16 +310,16 @@ export class DasService {
   async getAssetsByOwner(params: GetAssetsByOwnerParams) {
     try {
       const { ownerAddress, page = 1, limit = 100 } = params;
-  
+
       if (!ownerAddress) {
         throw new HttpException(
           'Owner address is required',
           HttpStatus.BAD_REQUEST,
         );
       }
-  
+
       const rpcUrl = await this.getRpcUrl(ownerAddress, params.network);
-  
+
       const response = await fetch(rpcUrl, {
         method: 'POST',
         headers: {
@@ -370,7 +380,9 @@ export class DasService {
       const requestLimit = Math.min(100, limit * 2);
       const validatedPage = Math.max(1, Math.floor(Number(page)));
       const rpcUrl = await this.getRpcUrl(ownerAddress, params.network);
-      const response = await axios.post(rpcUrl, {
+      const response = await axios.post(
+        rpcUrl,
+        {
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getAssetsByOwner',
@@ -390,12 +402,13 @@ export class DasService {
               showZeroBalance: false,
             },
           },
-      },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
       // if (!response.ok) {
       //   throw new HttpException(
@@ -403,7 +416,6 @@ export class DasService {
       //     HttpStatus.BAD_GATEWAY,
       //   );
       // }
-      
 
       const data = (await response.data) as GetAssetsByOwnerResponse;
 
@@ -439,35 +451,37 @@ export class DasService {
     }
   }
 
-  async getWalletPortfolioValue(params: GetWalletPortfolioParams): Promise<PortfolioValue> {
+  async getWalletPortfolioValue(
+    params: GetWalletPortfolioParams,
+  ): Promise<PortfolioValue> {
     try {
       let totalValue = 0;
       let allTokens = [];
       let page = 1;
       const limit = 100;
-      
+
       while (true) {
         const response = await this.getFungibleTokensByOwner({
           ownerAddress: params.ownerAddress,
           limit,
           page,
-          network: params.network
+          network: params.network,
         });
-  
+
         const tokens = response.items
-          .filter(asset => asset.interface === 'FungibleToken')
-          .map(asset => this.calculateTokenValue(asset))
+          .filter((asset) => asset.interface === 'FungibleToken')
+          .map((asset) => this.calculateTokenValue(asset))
           .filter(Boolean);
-  
+
         if (tokens.length === 0) break;
-  
+
         allTokens = [...allTokens, ...tokens];
         totalValue += tokens.reduce((sum, token) => sum + token!.value, 0);
-        
+
         if (tokens.length < limit) break;
         page++;
       }
-  
+
       return {
         totalValue: Number(totalValue.toFixed(2)),
         tokens: allTokens.sort((a, b) => b!.value - a!.value),
@@ -478,11 +492,11 @@ export class DasService {
   }
 
   async getPortfolioAnalysis(
-    params: GetPortfolioParams
+    params: GetPortfolioParams,
   ): Promise<PortfolioSummary> {
     try {
       const portfolio = await this.getWalletPortfolioValue(params);
-  
+
       return {
         summary: {
           totalValue: portfolio.totalValue,
@@ -499,24 +513,28 @@ export class DasService {
       };
     } catch (error) {
       console.log(error);
-      
+
       throw new HttpException(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  async getCompleteWalletBalance(
-    params: GetCompleteBalanceParams
-  ): Promise<{
+  async getCompleteWalletBalance(params: GetCompleteBalanceParams): Promise<{
     nativeBalance: FormattedNativeBalance;
     tokenPortfolio: PortfolioValue;
     totalValueUsd: number;
   }> {
     try {
       const [nativeBalance, tokenPortfolio] = await Promise.all([
-        this.getNativeBalance({ ownerAddress: params.ownerAddress, network: params.network }),
-        this.getWalletPortfolioValue({ ownerAddress: params.ownerAddress, network: params.network }),
+        this.getNativeBalance({
+          ownerAddress: params.ownerAddress,
+          network: params.network,
+        }),
+        this.getWalletPortfolioValue({
+          ownerAddress: params.ownerAddress,
+          network: params.network,
+        }),
       ]);
-  
+
       return {
         nativeBalance,
         tokenPortfolio,
@@ -530,10 +548,13 @@ export class DasService {
   }
 
   async getTokenOrNativeBalance(
-    params: GetTokenBalanceParams
+    params: GetTokenBalanceParams,
   ): Promise<number> {
-    console.log('Service - getTokenOrNativeBalance called with params:', params);
-    
+    console.log(
+      'Service - getTokenOrNativeBalance called with params:',
+      params,
+    );
+
     try {
       if (!params.walletAddress) {
         console.log('Service - Missing wallet address');
@@ -542,11 +563,14 @@ export class DasService {
           HttpStatus.BAD_REQUEST,
         );
       }
-  
-      console.log('Service - Getting RPC URL for wallet:', params.walletAddress);
+
+      console.log(
+        'Service - Getting RPC URL for wallet:',
+        params.walletAddress,
+      );
       const rpcUrl = await this.getRpcUrl(params.walletAddress, params.network);
       console.log('Service - RPC URL obtained:', rpcUrl);
-  
+
       // If no token address, get SOL balance
       if (!params.tokenAddress) {
         console.log('Service - Fetching SOL balance');
@@ -569,23 +593,28 @@ export class DasService {
             },
           }),
         });
-  
+
         console.log('Service - SOL balance response status:', response.status);
-        
+
         if (!response.ok) {
-          console.error('Service - Failed to fetch SOL balance:', response.statusText);
+          console.error(
+            'Service - Failed to fetch SOL balance:',
+            response.statusText,
+          );
           throw new HttpException(
             'Failed to fetch SOL balance',
             HttpStatus.BAD_GATEWAY,
           );
         }
-  
+
         const data = await response.json();
         console.log('Service - SOL balance data:', data);
-        
-        return data.result.nativeBalance.lamports / Math.pow(10, this.SOL_DECIMALS);
+
+        return (
+          data.result.nativeBalance.lamports / Math.pow(10, this.SOL_DECIMALS)
+        );
       }
-  
+
       // For token balance
       console.log('Service - Fetching token balance for:', params.tokenAddress);
       const response = await fetch(rpcUrl, {
@@ -607,49 +636,54 @@ export class DasService {
           },
         }),
       });
-  
+
       console.log('Service - Token balance response status:', response.status);
-  
+
       if (!response.ok) {
-        console.error('Service - Failed to fetch token balance:', response.statusText);
+        console.error(
+          'Service - Failed to fetch token balance:',
+          response.statusText,
+        );
         throw new HttpException(
           'Failed to fetch token balance',
           HttpStatus.BAD_GATEWAY,
         );
       }
-  
+
       const data = await response.json();
       console.log('Service - Token balance data:', data);
-  
+
       // Find the specific token
       const tokens = data.result.items;
       const token = tokens.find(
-        (t) => t.id === params.tokenAddress || 
-               t.content?.metadata?.mint === params.tokenAddress
+        (t) =>
+          t.id === params.tokenAddress ||
+          t.content?.metadata?.mint === params.tokenAddress,
       );
-  
+
       console.log('Service - Found token:', token);
-  
+
       if (!token?.token_info) {
         console.log('Service - No token info found, returning 0');
         return 0;
       }
-  
-      const balance = token.token_info.balance / Math.pow(10, token.token_info.decimals);
+
+      const balance =
+        token.token_info.balance / Math.pow(10, token.token_info.decimals);
       console.log('Service - Calculated balance:', balance);
-      
+
       return balance;
     } catch (error) {
       console.error('Service - Detailed error:', {
         error,
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
-      
+
       if (error instanceof HttpException) {
         throw error;
       }
-      
+
       throw new HttpException(
         `Error fetching balance: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -657,27 +691,32 @@ export class DasService {
     }
   }
 
-  private async fetchTokenPrice(tokenAddress: string,  options?: BaseOptions): Promise<TokenPriceResponse> {
+  private async fetchTokenPrice(
+    tokenAddress: string,
+    options?: BaseOptions,
+  ): Promise<TokenPriceResponse> {
     try {
-      const response = await fetch(`https://api.jup.ag/price/v2?ids=${tokenAddress}`);
-      
+      const response = await fetch(
+        `https://api.jup.ag/price/v2?ids=${tokenAddress}`,
+      );
+
       if (!response.ok) {
         throw new HttpException(
           `Failed to fetch price: ${response.statusText}`,
           HttpStatus.BAD_GATEWAY,
         );
       }
-      
+
       const data = (await response.json()) as JupiterPriceResponse;
       const priceData = data.data[tokenAddress];
-      
+
       if (!priceData || !priceData.price) {
         throw new HttpException(
           'Price data not available for the given token',
           HttpStatus.NOT_FOUND,
         );
       }
-      
+
       return {
         price: priceData.price,
         symbol: priceData.mintSymbol,
@@ -694,7 +733,7 @@ export class DasService {
       );
     }
   }
-  
+
   async getTokenPrice(params: GetPriceParams): Promise<TokenPriceResponse> {
     if (!params.tokenAddress) {
       throw new HttpException(
@@ -702,7 +741,7 @@ export class DasService {
         HttpStatus.BAD_REQUEST,
       );
     }
-  
+
     try {
       // Validate that the token address is a valid Solana public key
       try {
@@ -713,14 +752,14 @@ export class DasService {
           HttpStatus.BAD_REQUEST,
         );
       }
-  
+
       return await this.fetchTokenPrice(params.tokenAddress, params);
     } catch (error) {
       console.error('Token Price Error:', {
         error,
         message: error.message,
         tokenAddress: params.tokenAddress,
-        network: params.network || 'auto-detect'
+        network: params.network || 'auto-detect',
       });
       if (error instanceof HttpException) {
         throw error;
@@ -737,35 +776,35 @@ export class DasService {
       // Create connection with network option
       const rpcUrl = await this.getRpcUrl(undefined, options?.network);
       const connection = new Connection(rpcUrl);
-      
+
       // Fetch TLDs using the parser
       const tlds = await getAllTld(connection);
-      
+
       return {
-        tlds: tlds.map((tld) => String(tld.tld))
+        tlds: tlds.map((tld) => String(tld.tld)),
       };
     } catch (error) {
       console.error('TLD Fetch Error:', {
         error,
         message: error.message,
-        network: options?.network || 'auto-detect'
+        network: options?.network || 'auto-detect',
       });
       throw new HttpException(
         `Failed to fetch TLDs: ${error.message}`,
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
   async getBlockTransactions(
-    params: GetBlockTransactionsParams
+    params: GetBlockTransactionsParams,
   ): Promise<BlockTransactionResponse> {
     const invokedPrograms = new Map<string, number>();
     const { slot, cursor, limit = 100 } = params;
-  
+
     try {
       const rpcUrl = await this.getRpcUrl(undefined, params.network);
-  
+
       // Get block data
       const response = await fetch(rpcUrl, {
         method: 'POST',
@@ -782,77 +821,87 @@ export class DasService {
           ],
         }),
       });
-  
+
       if (!response.ok) {
-        throw new HttpException('Failed to fetch block data', HttpStatus.BAD_GATEWAY);
+        throw new HttpException(
+          'Failed to fetch block data',
+          HttpStatus.BAD_GATEWAY,
+        );
       }
-  
+
       const data = await response.json();
       const block = data.result;
-  
+
       if (!block?.transactions || block.transactions.length === 0) {
         return {
           status: 'success',
-          oldest: "",
+          oldest: '',
           result: [],
         };
       }
-  
+
       // Process transactions
-      const transactions: BlockTransaction[] = block.transactions.map((tx: any, index: number) => {
-        let signature: string | undefined;
-        if (tx.transaction.signatures.length > 0) {
-          signature = tx.transaction.signatures[0];
-        }
-  
-        const programIndexes = 
-          tx.transaction.message.compiledInstructions
+      const transactions: BlockTransaction[] = block.transactions.map(
+        (tx: any, index: number) => {
+          let signature: string | undefined;
+          if (tx.transaction.signatures.length > 0) {
+            signature = tx.transaction.signatures[0];
+          }
+
+          const programIndexes = tx.transaction.message.compiledInstructions
             .map((ix: any) => ix.programIdIndex)
             .concat(
               tx.meta?.innerInstructions?.flatMap((ix: any) => {
                 return ix.instructions.map((ix: any) => ix.programIdIndex);
-              }) || []
+              }) || [],
             );
-  
-        const invocations = programIndexes.reduce(
-          (acc: Map<string, number>, programIndex: number) => {
-            const programId = tx.transaction.message.accountKeys[programIndex];
-            
-            const programTransactionCount = invokedPrograms.get(programId) || 0;
-            invokedPrograms.set(programId, programTransactionCount + 1);
-  
-            const count = acc.get(programId) || 0;
-            acc.set(programId, count + 1);
-  
-            return acc;
-          },
-          new Map<string, number>()
-        );
-  
-        return {
-          index,
-          signature,
-          meta: tx.meta,
-          invocations,
-        };
-      });
-  
+
+          const invocations = programIndexes.reduce(
+            (acc: Map<string, number>, programIndex: number) => {
+              const programId =
+                tx.transaction.message.accountKeys[programIndex];
+
+              const programTransactionCount =
+                invokedPrograms.get(programId) || 0;
+              invokedPrograms.set(programId, programTransactionCount + 1);
+
+              const count = acc.get(programId) || 0;
+              acc.set(programId, count + 1);
+
+              return acc;
+            },
+            new Map<string, number>(),
+          );
+
+          return {
+            index,
+            signature,
+            meta: tx.meta,
+            invocations,
+          };
+        },
+      );
+
       // Filter and process signatures
       let signatureList = transactions
-        .filter(({ invocations }) => 
-          !(invocations.has(this.VOTE_PROGRAM_ID.toBase58()) && invocations.size === 1)
+        .filter(
+          ({ invocations }) =>
+            !(
+              invocations.has(this.VOTE_PROGRAM_ID.toBase58()) &&
+              invocations.size === 1
+            ),
         )
         .map(({ signature }) => signature)
         .filter((sig): sig is string => sig !== undefined);
-  
+
       if (!signatureList.length) {
         return {
           status: 'success',
-          oldest: "",
+          oldest: '',
           result: [],
         };
       }
-  
+
       // Handle cursor pagination
       if (cursor) {
         const lastTransactionIndex = signatureList.indexOf(cursor);
@@ -860,9 +909,9 @@ export class DasService {
           signatureList = signatureList.slice(lastTransactionIndex + 1);
         }
       }
-  
+
       signatureList = signatureList.slice(0, limit);
-  
+
       // Get enriched transaction data
       const enrichedResponse = await fetch(rpcUrl, {
         method: 'POST',
@@ -871,23 +920,25 @@ export class DasService {
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getEnrichedTransactions',
-          params: { transactions: signatureList }
+          params: { transactions: signatureList },
         }),
       });
-  
+
       if (!enrichedResponse.ok) {
-        throw new HttpException('Failed to fetch enriched transactions', HttpStatus.BAD_GATEWAY);
+        throw new HttpException(
+          'Failed to fetch enriched transactions',
+          HttpStatus.BAD_GATEWAY,
+        );
       }
-  
+
       const enrichedData = await enrichedResponse.json();
       const result = enrichedData.result || [];
-  
+
       return {
         status: 'success',
-        oldest: signatureList[signatureList.length - 1] || "",
+        oldest: signatureList[signatureList.length - 1] || '',
         result,
       };
-  
     } catch (error) {
       return {
         status: 'error',
@@ -897,11 +948,11 @@ export class DasService {
   }
 
   async getCNFTTransactions(
-    params: GetCNFTTransactionsParams
+    params: GetCNFTTransactionsParams,
   ): Promise<CNFTTransactionResponse> {
     try {
       const rpcUrl = await this.getRpcUrl(undefined, params.network);
-      
+
       // Get signatures for the asset
       const signaturesResponse = await fetch(rpcUrl, {
         method: 'POST',
@@ -915,29 +966,29 @@ export class DasService {
           params: {
             id: params.assetId,
             page: params.page,
-            limit: params.limit
+            limit: params.limit,
           },
         }),
       });
-  
+
       if (!signaturesResponse.ok) {
         throw new HttpException(
           'Failed to fetch signatures',
-          HttpStatus.BAD_GATEWAY
+          HttpStatus.BAD_GATEWAY,
         );
       }
-  
+
       const data = (await signaturesResponse.json()) as SignaturesResponse;
       const signatures = data.result.items.map(([signature]) => signature);
-  
+
       if (!signatures || signatures.length === 0) {
         return {
           status: 'success',
-          oldest: "",
+          oldest: '',
           result: [],
         };
       }
-  
+
       // Get enriched transactions
       const transactionsResponse = await fetch(rpcUrl, {
         method: 'POST',
@@ -948,20 +999,20 @@ export class DasService {
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getEnrichedTransactions',
-          params: { transactions: signatures }
+          params: { transactions: signatures },
         }),
       });
-  
+
       if (!transactionsResponse.ok) {
         throw new HttpException(
           'Failed to fetch transactions',
-          HttpStatus.BAD_GATEWAY
+          HttpStatus.BAD_GATEWAY,
         );
       }
-  
+
       const transactionsData = await transactionsResponse.json();
       const result = transactionsData.result || [];
-  
+
       return {
         status: 'success',
         oldest: signatures[signatures.length - 1],
@@ -978,483 +1029,556 @@ export class DasService {
     }
   }
 
-
   async getCurrentSlot(options?: GetSlotParams): Promise<SlotResponse> {
     try {
       const rpcUrl = await this.getRpcUrl(undefined, options?.network);
       const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 'helius-das',
-        method: 'getSlot',
-      }),
-    });
-
-    if (!response.ok) {
-      throw new HttpException(
-        'Failed to fetch current slot',
-        HttpStatus.BAD_GATEWAY
-      );
-    }
-
-    const data = await response.json();
-    
-    return {
-      status: 'success',
-      slot: data.result,
-    };
-  } catch (error) {
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    return {
-      status: 'error',
-      message: `Error fetching current slot: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
-
-async getRawTransaction(params: GetTransactionParams): Promise<RawTransactionResponse> {
-  try {
-    if (!params.signature) {
-      throw new HttpException(
-        'Transaction signature is required',
-        HttpStatus.BAD_REQUEST
-      );
-    }
-
-    const rpcUrl = await this.getRpcUrl(undefined, params.network);
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 'helius-das',
-        method: 'getTransaction',
-        params: [
-          params.signature,
-          {
-            maxSupportedTransactionVersion: 0,
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new HttpException(
-        'Failed to fetch transaction',
-        HttpStatus.BAD_GATEWAY
-      );
-    }
-
-    const data = await response.json();
-
-    if (!data.result) {
-      return {
-        status: 'error',
-        message: 'Raw transaction not found',
-      };
-    }
-
-    return {
-      status: 'success',
-      transaction: data.result,
-    };
-  } catch (error) {
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    return {
-      status: 'error',
-      message: `Error fetching raw transaction: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
-
-async getTPS(options?: BaseOptions): Promise<TPSResponse> {
-  try {
-    console.log("1. Options received:", options);
-    console.log("2. NETWORK_URLS:", this.NETWORK_URLS);
-    
-    const rpcUrl = await this.getRpcUrl(undefined, options?.network);
-    console.log("3. Generated RPC URL:", rpcUrl);
-    
-    const requestBody = {
-      jsonrpc: '2.0',
-      id: 'helius-das',
-      method: 'getRecentPerformanceSamples',
-      params: [4]
-    };
-    console.log("4. Request body:", JSON.stringify(requestBody, null, 2));
-    
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-    console.log("5. Response status:", response.status);
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.log("6. Error response:", errorData);
-      throw new HttpException(
-        'Failed to fetch performance samples',
-        HttpStatus.BAD_GATEWAY
-      );
-    }
-
-    const data = await response.json();
-    console.log("7. Response data:", data);
-    
-    const perfSamples = data.result;
-
-    if (!perfSamples?.length || 
-        !perfSamples[0]?.numTransactions || 
-        !perfSamples[0]?.samplePeriodSecs) {
-      console.log("8. Invalid perfSamples:", perfSamples);
-      throw new HttpException(
-        'No performance samples available',
-        HttpStatus.NOT_FOUND
-      );
-    }
-
-    const tps = perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs;
-    console.log("9. Calculated TPS:", tps);
-
-    return {
-      status: 'success',
-      tps,
-    };
-  } catch (error) {
-    console.log("10. Error caught:", error);
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    return {
-      status: 'error',
-      message: `Error fetching TPS: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
-
-async getEnrichedTransaction(
-  params: GetTransactionParams
-): Promise<EnrichedTransactionResponse> {
-  try {
-    const rpcUrl = await this.getRpcUrl(undefined, params.network);
-    console.log('Getting transaction details for signature:', params.signature);
-
-    // First get the transaction details
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 'helius-das',
-        method: 'getTransaction',
-        params: [
-          params.signature,
-          {
-            maxSupportedTransactionVersion: 0,
-            encoding: 'jsonParsed',
-            commitment: 'confirmed'
-          }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch transaction:', response.statusText);
-      return {
-        status: 'error',
-        message: 'Transaction not found',
-      };
-    }
-
-    const data = await response.json();
-    console.log('Transaction response received');
-
-    if (!data.result) {
-      console.log('No transaction data found');
-      return {
-        status: 'error',
-        message: 'Transaction not found',
-      };
-    }
-
-    // Enhance the transaction data with additional information
-    const enrichedTx = {
-      ...data.result,
-      // Add computed fields
-      timestamp: data.result.blockTime ? new Date(data.result.blockTime * 1000).toISOString() : null,
-      fee: data.result.meta?.fee || 0,
-      status: data.result.meta?.err ? 'failed' : 'success',
-      computeUnits: data.result.meta?.computeUnitsConsumed || 0,
-    };
-
-    // If the transaction has token transfers, get token information
-    if (data.result.meta?.postTokenBalances?.length > 0) {
-      // Add token balance changes
-      enrichedTx.tokenTransfers = data.result.meta.postTokenBalances.map((postBalance: any) => {
-        const preBalance = data.result.meta.preTokenBalances.find(
-          (pre: any) => pre.accountIndex === postBalance.accountIndex
-        );
-        
-        return {
-          accountIndex: postBalance.accountIndex,
-          mint: postBalance.mint,
-          preBalance: preBalance?.uiTokenAmount.uiAmount || 0,
-          postBalance: postBalance.uiTokenAmount.uiAmount,
-          decimals: postBalance.uiTokenAmount.decimals,
-        };
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'helius-das',
+          method: 'getSlot',
+        }),
       });
-    }
 
-    return {
-      status: 'success',
-      transaction: enrichedTx,
-    };
-  } catch (error) {
-    console.error('Error in getEnrichedTransaction:', error);
-    return {
-      status: 'error',
-      message: `Error fetching transaction: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
+      if (!response.ok) {
+        throw new HttpException(
+          'Failed to fetch current slot',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
 
-async getAccountTransactions(
-  params: GetAccountTransactionsParams
-): Promise<TransactionsResponse> {
-  try {
-    console.log('Starting getAccountTransactions with params:', params);
+      const data = await response.json();
 
-    const rpcUrl = await this.getRpcUrl(params.account, params.network);
-    console.log('RPC URL:', rpcUrl);
-
-    // First get signatures
-    const requestBody = {
-      jsonrpc: '2.0',
-      id: 'helius-das',
-      method: 'getSignaturesForAddress',
-      params: [
-        params.account,
-        {
-          limit: 100,
-          before: params.options.cursor,
-        }
-      ],
-    };
-
-    console.log('Getting signatures with body:', JSON.stringify(requestBody, null, 2));
-
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response:', errorText);
-      return {
-        status: 'error',
-        message: `Failed to fetch signatures: ${response.status} - ${errorText}`,
-      };
-    }
-
-    const data = await response.json();
-    console.log('Signatures response:', JSON.stringify(data, null, 2));
-
-    if (data.error) {
-      console.error('RPC error:', data.error);
-      return {
-        status: 'error',
-        message: `RPC error: ${data.error.message || JSON.stringify(data.error)}`,
-      };
-    }
-
-    const signatures = data.result || [];
-    
-    if (signatures.length === 0) {
       return {
         status: 'success',
-        oldest: '',
-        result: [],
+        slot: data.result,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      return {
+        status: 'error',
+        message: `Error fetching current slot: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
+  }
 
-    // Get transactions for each signature
-    const transactions = await Promise.all(
-      signatures.map(async (sig) => {
-        const txRequestBody = {
+  async getRawTransaction(
+    params: GetTransactionParams,
+  ): Promise<RawTransactionResponse> {
+    try {
+      if (!params.signature) {
+        throw new HttpException(
+          'Transaction signature is required',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const rpcUrl = await this.getRpcUrl(undefined, params.network);
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getTransaction',
           params: [
-            typeof sig === 'string' ? sig : sig.signature,
+            params.signature,
             {
               maxSupportedTransactionVersion: 0,
-              encoding: 'jsonParsed'
-            }
+            },
           ],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new HttpException(
+          'Failed to fetch transaction',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      const data = await response.json();
+
+      if (!data.result) {
+        return {
+          status: 'error',
+          message: 'Raw transaction not found',
         };
+      }
 
-        const txResponse = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(txRequestBody),
-        });
-
-        if (!txResponse.ok) {
-          console.error(`Error fetching transaction for signature ${sig}:`, txResponse.statusText);
-          return null;
-        }
-
-        const txData = await txResponse.json();
-        return txData.result;
-      })
-    );
-
-    // Filter out any null results from failed transaction fetches
-    const validTransactions = transactions.filter(tx => tx !== null);
-
-    return {
-      status: 'success',
-      oldest: signatures[signatures.length - 1]?.signature || 
-              signatures[signatures.length - 1] || '',
-      result: validTransactions,
-    };
-
-  } catch (error) {
-    console.error('Caught error:', error);
-    return {
-      status: 'error',
-      message: `Error fetching transactions: ${error instanceof Error ? 
-        `${error.message} ${error.stack ? `(${error.stack})` : ''}` : 
-        'Unknown error'}`
-    };
-  }
-}
-
-async getNiftyAsset(params: GetNiftyAssetParams): Promise<NiftyAssetResponse> {
-  try {
-    const rpcUrl = await this.getRpcUrl(params.assetAddress, params.network);
-    const connection = new Connection(rpcUrl, 'confirmed');
-    const pubKey = new PublicKey(params.assetAddress);
-    
-    const accountInfo = await connection.getAccountInfo(pubKey);
-    if (accountInfo) {
-      const assetData = getInternalAssetAccountDataSerializer().deserialize(accountInfo.data);
       return {
         status: 'success',
-        assetData,
+        transaction: data.result,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      return {
+        status: 'error',
+        message: `Error fetching raw transaction: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
-    
-    return {
-      status: 'success',
-      assetData: null,
-    };
-  } catch (error) {
-    return {
-      status: 'error',
-      message: `Error fetching Nifty asset data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
   }
-}
 
-async getSolanaDomain(params: GetDomainParams): Promise<DomainResponse> {
-  try {
-    const url = `https://api.helius.xyz/v0/addresses/${params.address}/names?api-key=${this.configService.get('HELIUS_API_KEY')}`;
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new HttpException('Failed to fetch domain names', HttpStatus.BAD_GATEWAY);
-    }
+  async getTPS(options?: BaseOptions): Promise<TPSResponse> {
+    try {
+      console.log('1. Options received:', options);
+      console.log('2. NETWORK_URLS:', this.NETWORK_URLS);
 
-    const data = await response.json();
-    
-    if (data?.domainNames) {
-      const usernames: Username[] = data.domainNames.map((domain: string) => ({
-        type: 'bonfida',
-        username: `${domain}.sol`,
-      }));
-      
+      const rpcUrl = await this.getRpcUrl(undefined, options?.network);
+      console.log('3. Generated RPC URL:', rpcUrl);
+
+      const requestBody = {
+        jsonrpc: '2.0',
+        id: 'helius-das',
+        method: 'getRecentPerformanceSamples',
+        params: [4],
+      };
+      console.log('4. Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      console.log('5. Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('6. Error response:', errorData);
+        throw new HttpException(
+          'Failed to fetch performance samples',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      const data = await response.json();
+      console.log('7. Response data:', data);
+
+      const perfSamples = data.result;
+
+      if (
+        !perfSamples?.length ||
+        !perfSamples[0]?.numTransactions ||
+        !perfSamples[0]?.samplePeriodSecs
+      ) {
+        console.log('8. Invalid perfSamples:', perfSamples);
+        throw new HttpException(
+          'No performance samples available',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const tps =
+        perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs;
+      console.log('9. Calculated TPS:', tps);
+
       return {
         status: 'success',
-        usernames,
+        tps,
+      };
+    } catch (error) {
+      console.log('10. Error caught:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      return {
+        status: 'error',
+        message: `Error fetching TPS: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
-    
-    return {
-      status: 'success',
-      usernames: [],
-    };
-  } catch (error) {
-    return {
-      status: 'error',
-      message: `Error fetching domain names: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
   }
-}
 
-async resolveAllDomains(params: ResolveDomainParams): Promise<DomainResolveResponse> {
-  try {
-    const rpcUrl = await this.getRpcUrl(undefined, params.network);
-    const connection = new Connection(rpcUrl, 'confirmed');
-    const parser = new TldParser(connection);
-    const resolvedAddress = await parser.getOwnerFromDomainTld(params.domain);
-    
-    return {
-      address: resolvedAddress?.toBase58(),
-    };
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Cannot read properties of undefined')) {
-      return { message: 'Domain not found' };
-    }
-    return {
-      message: `Domain resolution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
-
-async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveResponse> {
-  try {
-    if (!params.domain || typeof params.domain !== 'string') {
-      throw new HttpException(
-        'Invalid domain. Expected a non-empty string',
-        HttpStatus.BAD_REQUEST
+  async getEnrichedTransaction(
+    params: GetTransactionParams,
+  ): Promise<EnrichedTransactionResponse> {
+    try {
+      const rpcUrl = await this.getRpcUrl(undefined, params.network);
+      console.log(
+        'Getting transaction details for signature:',
+        params.signature,
       );
-    }
 
-    const rpcUrl = await this.getRpcUrl(undefined, params.network);
-    const connection = new Connection(rpcUrl, 'confirmed');
-    const resolvedAddress = await resolve(connection, params.domain);
-    
-    return {
-      address: resolvedAddress.toBase58(),
-    };
-  } catch (error) {
-    return {
-      message: `Failed to resolve domain: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
+      // First get the transaction details
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'helius-das',
+          method: 'getTransaction',
+          params: [
+            params.signature,
+            {
+              maxSupportedTransactionVersion: 0,
+              encoding: 'jsonParsed',
+              commitment: 'confirmed',
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch transaction:', response.statusText);
+        return {
+          status: 'error',
+          message: 'Transaction not found',
+        };
+      }
+
+      const data = await response.json();
+      console.log('Transaction response received');
+
+      if (!data.result) {
+        console.log('No transaction data found');
+        return {
+          status: 'error',
+          message: 'Transaction not found',
+        };
+      }
+
+      // Enhance the transaction data with additional information
+      const enrichedTx = {
+        ...data.result,
+        // Add computed fields
+        timestamp: data.result.blockTime
+          ? new Date(data.result.blockTime * 1000).toISOString()
+          : null,
+        fee: data.result.meta?.fee || 0,
+        status: data.result.meta?.err ? 'failed' : 'success',
+        computeUnits: data.result.meta?.computeUnitsConsumed || 0,
+      };
+
+      // If the transaction has token transfers, get token information
+      if (data.result.meta?.postTokenBalances?.length > 0) {
+        // Add token balance changes
+        enrichedTx.tokenTransfers = data.result.meta.postTokenBalances.map(
+          (postBalance: any) => {
+            const preBalance = data.result.meta.preTokenBalances.find(
+              (pre: any) => pre.accountIndex === postBalance.accountIndex,
+            );
+
+            return {
+              accountIndex: postBalance.accountIndex,
+              mint: postBalance.mint,
+              preBalance: preBalance?.uiTokenAmount.uiAmount || 0,
+              postBalance: postBalance.uiTokenAmount.uiAmount,
+              decimals: postBalance.uiTokenAmount.decimals,
+            };
+          },
+        );
+      }
+
+      return {
+        status: 'success',
+        transaction: enrichedTx,
+      };
+    } catch (error) {
+      console.error('Error in getEnrichedTransaction:', error);
+      return {
+        status: 'error',
+        message: `Error fetching transaction: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
   }
-}
+
+  async getAccountTransactions(
+    params: GetAccountTransactionsParams,
+  ): Promise<TransactionsResponse> {
+    try {
+      console.log('Starting getAccountTransactions with params:', params);
+
+      const rpcUrl = await this.getRpcUrl(params.account, params.network);
+      console.log('RPC URL:', rpcUrl);
+
+      // First get signatures
+      const requestBody = {
+        jsonrpc: '2.0',
+        id: 'helius-das',
+        method: 'getSignaturesForAddress',
+        params: [
+          params.account,
+          {
+            limit: 100,
+            before: params.options.cursor,
+          },
+        ],
+      };
+
+      console.log(
+        'Getting signatures with body:',
+        JSON.stringify(requestBody, null, 2),
+      );
+
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        return {
+          status: 'error',
+          message: `Failed to fetch signatures: ${response.status} - ${errorText}`,
+        };
+      }
+
+      const data = await response.json();
+      console.log('Signatures response:', JSON.stringify(data, null, 2));
+
+      if (data.error) {
+        console.error('RPC error:', data.error);
+        return {
+          status: 'error',
+          message: `RPC error: ${data.error.message || JSON.stringify(data.error)}`,
+        };
+      }
+
+      const signatures = data.result || [];
+
+      if (signatures.length === 0) {
+        return {
+          status: 'success',
+          oldest: '',
+          result: [],
+        };
+      }
+
+      // Get transactions for each signature
+      const transactions = await Promise.all(
+        signatures.map(async (sig) => {
+          const txRequestBody = {
+            jsonrpc: '2.0',
+            id: 'helius-das',
+            method: 'getTransaction',
+            params: [
+              typeof sig === 'string' ? sig : sig.signature,
+              {
+                maxSupportedTransactionVersion: 0,
+                encoding: 'jsonParsed',
+              },
+            ],
+          };
+
+          const txResponse = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(txRequestBody),
+          });
+
+          if (!txResponse.ok) {
+            console.error(
+              `Error fetching transaction for signature ${sig}:`,
+              txResponse.statusText,
+            );
+            return null;
+          }
+
+          const txData = await txResponse.json();
+          return txData.result;
+        }),
+      );
+
+      // Filter out any null results from failed transaction fetches
+      const validTransactions = transactions.filter((tx) => tx !== null);
+
+      return {
+        status: 'success',
+        oldest:
+          signatures[signatures.length - 1]?.signature ||
+          signatures[signatures.length - 1] ||
+          '',
+        result: validTransactions,
+      };
+    } catch (error) {
+      console.error('Caught error:', error);
+      return {
+        status: 'error',
+        message: `Error fetching transactions: ${
+          error instanceof Error
+            ? `${error.message} ${error.stack ? `(${error.stack})` : ''}`
+            : 'Unknown error'
+        }`,
+      };
+    }
+  }
+
+  async getNiftyAsset(
+    params: GetNiftyAssetParams,
+  ): Promise<NiftyAssetResponse> {
+    try {
+      const rpcUrl = await this.getRpcUrl(params.assetAddress, params.network);
+      const connection = new Connection(rpcUrl, 'confirmed');
+      const pubKey = new PublicKey(params.assetAddress);
+
+      const accountInfo = await connection.getAccountInfo(pubKey);
+      if (accountInfo) {
+        const assetData = getInternalAssetAccountDataSerializer().deserialize(
+          accountInfo.data,
+        );
+        return {
+          status: 'success',
+          assetData,
+        };
+      }
+
+      return {
+        status: 'success',
+        assetData: null,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error fetching Nifty asset data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  async getSolanaDomain(params: GetDomainParams): Promise<DomainResponse> {
+    try {
+      const url = `https://api.helius.xyz/v0/addresses/${params.address}/names?api-key=${this.configService.get('HELIUS_API_KEY')}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new HttpException(
+          'Failed to fetch domain names',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      const data = await response.json();
+
+      if (data?.domainNames) {
+        const usernames: Username[] = data.domainNames.map(
+          (domain: string) => ({
+            type: 'bonfida',
+            username: `${domain}.sol`,
+          }),
+        );
+
+        return {
+          status: 'success',
+          usernames,
+        };
+      }
+
+      return {
+        status: 'success',
+        usernames: [],
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: `Error fetching domain names: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  async resolveAllDomains(
+    params: ResolveDomainParams,
+  ): Promise<DomainResolveResponse> {
+    try {
+      const rpcUrl = await this.getRpcUrl(undefined, params.network);
+      const connection = new Connection(rpcUrl, 'confirmed');
+      const parser = new TldParser(connection);
+      const resolvedAddress = await parser.getOwnerFromDomainTld(params.domain);
+
+      return {
+        address: resolvedAddress?.toBase58(),
+      };
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Cannot read properties of undefined')
+      ) {
+        return { message: 'Domain not found' };
+      }
+      return {
+        message: `Domain resolution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  async resolveSolDomain(
+    params: ResolveDomainParams,
+  ): Promise<DomainResolveResponse> {
+    try {
+      if (!params.domain || typeof params.domain !== 'string') {
+        throw new HttpException(
+          'Invalid domain. Expected a non-empty string',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const rpcUrl = await this.getRpcUrl(undefined, params.network);
+      const connection = new Connection(rpcUrl, 'confirmed');
+      const resolvedAddress = await resolve(connection, params.domain);
+
+      return {
+        address: resolvedAddress.toBase58(),
+      };
+    } catch (error) {
+      return {
+        message: `Failed to resolve domain: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  async checkAddressOwnership(address: string): Promise<{
+    isToken: boolean;
+    isWallet: boolean;
+    isProgram: boolean;
+    owner: string | null;
+  }> {
+    try {
+      const TOKEN_PROGRAM_ID = new PublicKey(
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      );
+      const BPF_LOADER_ID = new PublicKey(
+        'BPFLoaderUpgradeab1e11111111111111111111111',
+      );
+      const SYSTEM_PROGRAM_ID = new PublicKey(
+        '11111111111111111111111111111111',
+      );
+
+      const pubkey = new PublicKey(address);
+      const accountInfo = await this.connection.getAccountInfo(pubkey);
+
+      if (!accountInfo) {
+        throw new Error('Account not found');
+      }
+
+      const owner = accountInfo.owner.toBase58();
+
+      return {
+        isToken: owner === TOKEN_PROGRAM_ID.toBase58(),
+        isWallet: owner === SYSTEM_PROGRAM_ID.toBase58(),
+        isProgram: owner === BPF_LOADER_ID.toBase58(),
+        owner,
+      };
+    } catch (error) {
+      throw new Error(`Failed to check ownership: ${error.message}`);
+    }
+  }
 }
 
 // import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
@@ -1499,7 +1623,6 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //   private readonly heliusUrl: string;
 //   private readonly SOL_DECIMALS = 9; // Solana uses 9 decimals
 //   private readonly VOTE_PROGRAM_ID = new PublicKey('Vote111111111111111111111111111111111111111');
-
 
 //   constructor(private configService: ConfigService) {
 //     const apikey = this.configService.get<string>('HELIUS_API_KEY');
@@ -1919,7 +2042,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           HttpStatus.BAD_REQUEST,
 //         );
 //       }
-  
+
 //       // If no token address, get SOL balance
 //       if (!tokenAddress) {
 //         const response = await fetch(this.heliusUrl, {
@@ -1934,18 +2057,18 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //             params: [walletAddress],
 //           }),
 //         });
-  
+
 //         if (!response.ok) {
 //           throw new HttpException(
 //             'Failed to fetch SOL balance',
 //             HttpStatus.BAD_GATEWAY,
 //           );
 //         }
-  
+
 //         const data = await response.json();
 //         return data.result / Math.pow(10, this.SOL_DECIMALS);
 //       }
-  
+
 //       // Get token accounts for SPL token
 //       const response = await fetch(this.heliusUrl, {
 //         method: 'POST',
@@ -1967,26 +2090,26 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           ],
 //         }),
 //       });
-  
+
 //       if (!response.ok) {
 //         throw new HttpException(
 //           'Failed to fetch token accounts',
 //           HttpStatus.BAD_GATEWAY,
 //         );
 //       }
-  
+
 //       const data = await response.json();
-      
+
 //       if (data.result.value.length === 0) {
 //         console.warn(
 //           `No token accounts found for wallet ${walletAddress} and token ${tokenAddress}`,
 //         );
 //         return 0;
 //       }
-  
+
 //       const tokenAccount = data.result.value[0];
 //       const parsedData = tokenAccount.account.data as ParsedTokenAccountData;
-      
+
 //       return parsedData.parsed.info.tokenAmount.uiAmount || 0;
 //     } catch (error) {
 //       if (error instanceof HttpException) {
@@ -2002,24 +2125,24 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //   private async fetchTokenPrice(tokenAddress: string): Promise<TokenPriceResponse> {
 //     try {
 //       const response = await fetch(`https://api.jup.ag/price/v2?ids=${tokenAddress}`);
-      
+
 //       if (!response.ok) {
 //         throw new HttpException(
 //           `Failed to fetch price: ${response.statusText}`,
 //           HttpStatus.BAD_GATEWAY,
 //         );
 //       }
-      
+
 //       const data = (await response.json()) as JupiterPriceResponse;
 //       const priceData = data.data[tokenAddress];
-      
+
 //       if (!priceData || !priceData.price) {
 //         throw new HttpException(
 //           'Price data not available for the given token',
 //           HttpStatus.NOT_FOUND,
 //         );
 //       }
-      
+
 //       return {
 //         price: priceData.price,
 //         symbol: priceData.mintSymbol,
@@ -2036,7 +2159,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //       );
 //     }
 //   }
-  
+
 //   async getTokenPrice(tokenAddress: string): Promise<TokenPriceResponse> {
 //     if (!tokenAddress) {
 //       throw new HttpException(
@@ -2044,7 +2167,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //         HttpStatus.BAD_REQUEST,
 //       );
 //     }
-  
+
 //     try {
 //       // Validate that the token address is a valid Solana public key
 //       try {
@@ -2055,7 +2178,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           HttpStatus.BAD_REQUEST,
 //         );
 //       }
-  
+
 //       return await this.fetchTokenPrice(tokenAddress);
 //     } catch (error) {
 //       if (error instanceof HttpException) {
@@ -2072,10 +2195,10 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //     try {
 //       // Create connection from Helius URL
 //       const connection = new Connection(this.heliusUrl);
-      
+
 //       // Fetch TLDs using the parser
 //       const tlds = await getAllTld(connection);
-      
+
 //       // Map and return the TLD strings
 //       return {
 //         tlds: tlds.map((tld) => String(tld.tld))
@@ -2094,7 +2217,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //     limit: number = 100,
 //   ): Promise<BlockTransactionResponse> {
 //     const invokedPrograms = new Map<string, number>();
-  
+
 //     try {
 //       // Get block data
 //       const response = await fetch(this.heliusUrl, {
@@ -2112,14 +2235,14 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           ],
 //         }),
 //       });
-  
+
 //       if (!response.ok) {
 //         throw new HttpException('Failed to fetch block data', HttpStatus.BAD_GATEWAY);
 //       }
-  
+
 //       const data = await response.json();
 //       const block = data.result;
-  
+
 //       if (!block?.transactions || block.transactions.length === 0) {
 //         return {
 //           status: 'success',
@@ -2127,15 +2250,15 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           result: [],
 //         };
 //       }
-  
+
 //       // Process transactions
 //       const transactions: BlockTransaction[] = block.transactions.map((tx: any, index: number) => {
 //         let signature: string | undefined;
 //         if (tx.transaction.signatures.length > 0) {
 //           signature = tx.transaction.signatures[0];
 //         }
-  
-//         const programIndexes = 
+
+//         const programIndexes =
 //           tx.transaction.message.compiledInstructions
 //             .map((ix: any) => ix.programIdIndex)
 //             .concat(
@@ -2143,22 +2266,22 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //                 return ix.instructions.map((ix: any) => ix.programIdIndex);
 //               }) || []
 //             );
-  
+
 //         const invocations = programIndexes.reduce(
 //           (acc: Map<string, number>, programIndex: number) => {
 //             const programId = tx.transaction.message.accountKeys[programIndex];
-            
+
 //             const programTransactionCount = invokedPrograms.get(programId) || 0;
 //             invokedPrograms.set(programId, programTransactionCount + 1);
-  
+
 //             const count = acc.get(programId) || 0;
 //             acc.set(programId, count + 1);
-  
+
 //             return acc;
 //           },
 //           new Map<string, number>()
 //         );
-  
+
 //         return {
 //           index,
 //           signature,
@@ -2166,15 +2289,15 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           invocations,
 //         };
 //       });
-  
+
 //       // Filter and process signatures
 //       let signatureList = transactions
-//         .filter(({ invocations }) => 
+//         .filter(({ invocations }) =>
 //           !(invocations.has(this.VOTE_PROGRAM_ID.toBase58()) && invocations.size === 1)
 //         )
 //         .map(({ signature }) => signature)
 //         .filter((sig): sig is string => sig !== undefined);
-  
+
 //       if (!signatureList.length) {
 //         return {
 //           status: 'success',
@@ -2182,7 +2305,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           result: [],
 //         };
 //       }
-  
+
 //       // Handle cursor pagination
 //       if (cursor) {
 //         const lastTransactionIndex = signatureList.indexOf(cursor);
@@ -2190,9 +2313,9 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           signatureList = signatureList.slice(lastTransactionIndex + 1);
 //         }
 //       }
-  
+
 //       signatureList = signatureList.slice(0, limit);
-  
+
 //       // Get enriched transaction data
 //       const enrichedResponse = await fetch(this.heliusUrl, {
 //         method: 'POST',
@@ -2204,20 +2327,20 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           params: { transactions: signatureList }
 //         }),
 //       });
-  
+
 //       if (!enrichedResponse.ok) {
 //         throw new HttpException('Failed to fetch enriched transactions', HttpStatus.BAD_GATEWAY);
 //       }
-  
+
 //       const enrichedData = await enrichedResponse.json();
 //       const result = enrichedData.result || [];
-  
+
 //       return {
 //         status: 'success',
 //         oldest: signatureList[signatureList.length - 1] || "",
 //         result,
 //       };
-  
+
 //     } catch (error) {
 //       return {
 //         status: 'error',
@@ -2249,17 +2372,17 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           },
 //         }),
 //       });
-  
+
 //       if (!signaturesResponse.ok) {
 //         throw new HttpException(
 //           'Failed to fetch signatures',
 //           HttpStatus.BAD_GATEWAY
 //         );
 //       }
-  
+
 //       const data = (await signaturesResponse.json()) as SignaturesResponse;
 //       const signatures = data.result.items.map(([signature]) => signature);
-  
+
 //       if (!signatures || signatures.length === 0) {
 //         return {
 //           status: 'success',
@@ -2267,7 +2390,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           result: [],
 //         };
 //       }
-  
+
 //       // Get enriched transactions
 //       const transactionsResponse = await fetch(this.heliusUrl, {
 //         method: 'POST',
@@ -2281,17 +2404,17 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //           params: { transactions: signatures }
 //         }),
 //       });
-  
+
 //       if (!transactionsResponse.ok) {
 //         throw new HttpException(
 //           'Failed to fetch transactions',
 //           HttpStatus.BAD_GATEWAY
 //         );
 //       }
-  
+
 //       const transactionsData = await transactionsResponse.json();
 //       const result = transactionsData.result || [];
-  
+
 //       return {
 //         status: 'success',
 //         oldest: signatures[signatures.length - 1],
@@ -2308,7 +2431,6 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //     }
 //   }
 
-  
 // // async getMerkleTree(address: string): Promise<MerkleTreeResponse> {
 // //   try {
 // //     // Validate address format
@@ -2379,7 +2501,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //     }
 
 //     const data = await response.json();
-    
+
 //     return {
 //       status: 'success',
 //       slot: data.result,
@@ -2477,8 +2599,8 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //     const data = await response.json();
 //     const perfSamples = data.result;
 
-//     if (!perfSamples?.length || 
-//         !perfSamples[0]?.numTransactions || 
+//     if (!perfSamples?.length ||
+//         !perfSamples[0]?.numTransactions ||
 //         !perfSamples[0]?.samplePeriodSecs) {
 //       throw new HttpException(
 //         'No performance samples available',
@@ -2606,7 +2728,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //   try {
 //     const connection = new Connection(this.heliusUrl, 'confirmed');
 //     const pubKey = new PublicKey(assetAddress);
-    
+
 //     const accountInfo = await connection.getAccountInfo(pubKey);
 //     if (accountInfo) {
 //       const assetData = getInternalAssetAccountDataSerializer().deserialize(accountInfo.data);
@@ -2615,7 +2737,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //         assetData,
 //       };
 //     }
-    
+
 //     return {
 //       status: 'success',
 //       assetData: null,
@@ -2632,25 +2754,25 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //   try {
 //     const url = `https://api.helius.xyz/v0/addresses/${address}/names?api-key=${this.configService.get('HELIUS_API_KEY')}`;
 //     const response = await fetch(url);
-    
+
 //     if (!response.ok) {
 //       throw new HttpException('Failed to fetch domain names', HttpStatus.BAD_GATEWAY);
 //     }
 
 //     const data = await response.json();
-    
+
 //     if (data?.domainNames) {
 //       const usernames: Username[] = data.domainNames.map((domain: string) => ({
 //         type: 'bonfida',
 //         username: `${domain}.sol`,
 //       }));
-      
+
 //       return {
 //         status: 'success',
 //         usernames,
 //       };
 //     }
-    
+
 //     return {
 //       status: 'success',
 //       usernames: [],
@@ -2668,7 +2790,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 //     const connection = new Connection(this.heliusUrl, 'confirmed');
 //     const parser = new TldParser(connection);
 //     const resolvedAddress = await parser.getOwnerFromDomainTld(domain);
-    
+
 //     return {
 //       address: resolvedAddress?.toBase58(),
 //     };
@@ -2693,7 +2815,7 @@ async resolveSolDomain(params: ResolveDomainParams): Promise<DomainResolveRespon
 
 //     const connection = new Connection(this.heliusUrl, 'confirmed');
 //     const resolvedAddress = await resolve(connection, domain);
-    
+
 //     return {
 //       address: resolvedAddress.toBase58(),
 //     };
