@@ -248,6 +248,51 @@ export class ChatService {
     }
   }
 
+  getStreamingAIResponse(question: string): Observable<any> {
+    return new Observable((subscriber) => {
+      this.httpService
+        .axiosRef({
+          method: 'POST',
+          url: 'https://chat.catoly.ai/agent',
+          data: {
+            question,
+            thread_id: 0,
+          },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          responseType: 'stream',
+        })
+        .then((response) => {
+          response.data.on('data', (chunk: Buffer) => {
+            try {
+              const text = chunk.toString('utf-8');
+              subscriber.next(text);
+            } catch (error) {
+              console.error('Error processing chunk:', error);
+            }
+          });
+
+          response.data.on('end', () => {
+            subscriber.complete();
+          });
+
+          response.data.on('error', (error) => {
+            subscriber.error(error);
+          });
+        })
+        .catch((error) => {
+          console.error('Request error:', error);
+          subscriber.error(error);
+        });
+
+      // Return cleanup function
+      return () => {
+        console.log('Cleaning up stream subscription');
+      };
+    });
+  }
+
   async deleteMessage(messageId: string, userId: string) {
     const message = await this.messageModel.findById(messageId);
 
