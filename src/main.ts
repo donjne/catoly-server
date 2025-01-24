@@ -5,7 +5,7 @@ import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  
+
   try {
     const app = await NestFactory.create(AppModule, {
       logger: ['error', 'warn', 'log', 'debug', 'verbose'],
@@ -18,14 +18,14 @@ async function bootstrap() {
     
     // Enable CORS
     app.enableCors({
-      origin: ['https://toly-six.vercel.app', 'http://localhost:3000'],
-      credentials: true,
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-      allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+      origin: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: '*',
+      credentials: false,
     });
 
     // Start the application
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT || 4600;
     await app.listen(port);
     logger.log(`Application is running on: ${await app.getUrl()}`);
   } catch (error) {

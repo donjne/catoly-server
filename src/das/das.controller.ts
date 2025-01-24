@@ -33,21 +33,21 @@ export class DasController {
   // Static routes first (no parameters)
   @Get('slot')
   async getCurrentSlot(
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<SlotResponse> {
     return this.dasService.getCurrentSlot({ network });
   }
 
   @Get('tlds')
   async getAllTLDs(
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<TLDResponse> {
     return this.dasService.getAllTLDs({ network });
   }
 
   @Get('tps')
   async getTPS(
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<TPSResponse> {
     return this.dasService.getTPS({ network });
   }
@@ -56,12 +56,12 @@ export class DasController {
   async getBalance(
     @Query('wallet') walletAddress: string,
     @Query('token') tokenAddress?: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<number> {
     return this.dasService.getTokenOrNativeBalance({
       walletAddress,
       tokenAddress,
-      network
+      network,
     });
   }
 
@@ -71,13 +71,13 @@ export class DasController {
     @Param('address') ownerAddress: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ) {
     return this.dasService.getAssetsByOwner({
       ownerAddress,
       page,
       limit,
-      network
+      network,
     });
   }
 
@@ -88,7 +88,7 @@ export class DasController {
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
     @Query('before') before?: string,
     @Query('after') after?: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ) {
     return this.dasService.getFungibleTokensByOwner({
       ownerAddress,
@@ -96,15 +96,16 @@ export class DasController {
       limit,
       before,
       after,
-      network
+      network,
     });
   }
 
   @Get('spl-portfolio/:address')
   async getPortfolioValue(
     @Param('address') ownerAddress: string,
-    @Query('detailed', new DefaultValuePipe(false), ParseBoolPipe) detailed: boolean,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('detailed', new DefaultValuePipe(false), ParseBoolPipe)
+    detailed: boolean,
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<PortfolioValue | PortfolioSummary> {
     return detailed
       ? this.dasService.getPortfolioAnalysis({ ownerAddress, network })
@@ -114,7 +115,7 @@ export class DasController {
   @Get('native-balance/:address')
   async getNativeBalance(
     @Param('address') ownerAddress: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<FormattedNativeBalance> {
     return this.dasService.getNativeBalance({ ownerAddress, network });
   }
@@ -122,7 +123,7 @@ export class DasController {
   @Get('portfolio/:address')
   async getCompleteBalance(
     @Param('address') ownerAddress: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ) {
     return this.dasService.getCompleteWalletBalance({ ownerAddress, network });
   }
@@ -130,7 +131,7 @@ export class DasController {
   @Get('price/:tokenAddress')
   async getPrice(
     @Param('tokenAddress') tokenAddress: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<TokenPriceResponse> {
     return this.dasService.getTokenPrice({ tokenAddress, network });
   }
@@ -140,9 +141,14 @@ export class DasController {
     @Param('slot', ParseIntPipe) slot: number,
     @Query('cursor') cursor?: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit?: number,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<BlockTransactionResponse> {
-    return this.dasService.getBlockTransactions({ slot, cursor, limit, network });
+    return this.dasService.getBlockTransactions({
+      slot,
+      cursor,
+      limit,
+      network,
+    });
   }
 
   @Get('cnft/:assetId')
@@ -150,15 +156,20 @@ export class DasController {
     @Param('assetId') assetId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<CNFTTransactionResponse> {
-    return this.dasService.getCNFTTransactions({ assetId, page, limit, network });
+    return this.dasService.getCNFTTransactions({
+      assetId,
+      page,
+      limit,
+      network,
+    });
   }
 
   @Get('nifty/:address')
   async getNiftyAsset(
     @Param('address') assetAddress: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<NiftyAssetResponse> {
     return this.dasService.getNiftyAsset({ assetAddress, network });
   }
@@ -166,7 +177,7 @@ export class DasController {
   @Get('transaction/:signature')
   async getRawTransaction(
     @Param('signature') signature: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<RawTransactionResponse> {
     return this.dasService.getRawTransaction({ signature, network });
   }
@@ -175,16 +186,20 @@ export class DasController {
   async getEnrichedTransaction(
     @Param('signature') signature: string,
     @Query('account') account?: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<EnrichedTransactionResponse> {
-    return this.dasService.getEnrichedTransaction({ signature, account, network });
+    return this.dasService.getEnrichedTransaction({
+      signature,
+      account,
+      network,
+    });
   }
 
   // Domain-specific routes
   @Get('domain/:address')
   async getSolanaDomain(
     @Param('address') address: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<DomainResponse> {
     return this.dasService.getSolanaDomain({ address, network });
   }
@@ -192,7 +207,7 @@ export class DasController {
   @Get('domain/resolve/all/:domain')
   async resolveAllDomains(
     @Param('domain') domain: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<DomainResolveResponse> {
     return this.dasService.resolveAllDomains({ domain, network });
   }
@@ -200,7 +215,7 @@ export class DasController {
   @Get('domain/resolve/sol/:domain')
   async resolveSolDomain(
     @Param('domain') domain: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<DomainResolveResponse> {
     return this.dasService.resolveSolDomain({ domain, network });
   }
@@ -212,24 +227,27 @@ export class DasController {
     @Query('cursor') cursor?: string,
     @Query('filter') filter?: string,
     @Query('user') user?: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<TransactionsResponse> {
     console.log('Controller: getAccountTransactions called with:', {
       account,
       cursor,
       filter,
       user,
-      network
+      network,
     });
-  
+
     try {
       const result = await this.dasService.getAccountTransactions({
         account,
         options: { cursor, filter, user },
-        network
+        network,
       });
-      
-      console.log('Controller: Transaction fetch result status:', result.status);
+
+      console.log(
+        'Controller: Transaction fetch result status:',
+        result.status,
+      );
       return result;
     } catch (error) {
       console.error('Controller: Error in getAccountTransactions:', error);
@@ -244,9 +262,14 @@ export class DasController {
   @Get(':id')
   async getAsset(
     @Param('id') id: string,
-    @Query('network') network?: 'mainnet' | 'devnet'
+    @Query('network') network?: 'mainnet' | 'devnet',
   ) {
     return this.dasService.getAsset({ id, network });
+  }
+
+  @Get('ownership/:address')
+  async getOwnership(@Param('address') address: string) {
+    return await this.dasService.checkAddressOwnership(address);
   }
 }
 

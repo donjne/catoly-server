@@ -4,6 +4,7 @@
 
 - [DAS Endpoints](#das-endpoints)
   - [Get Asset](#get-asset)
+   - [Get Solana Account Type](#get-solana-account-type)
   - [Get Assets by Owner](#get-assets-by-owner)
   - [Get Fungible Tokens](#get-fungible-tokens)
   - [Get Portfolio Value](#get-portfolio-value)
@@ -55,6 +56,20 @@ Retrieves a specific asset by its ID.
 - `network` (query parameter, string, optional): 'mainnet' or 'devnet'
 
 **Response:** Asset details
+
+### Get Solana Account Type
+
+```bash
+GET /das/ownership/:address
+```
+
+Used to check if a specific account is a Token, Wallet or Program on solana
+
+**Parameters:**
+
+- `address` (path parameter, string): The unique public key of the account
+
+**Response:** Account type
 
 ### Get Assets by Owner
 
