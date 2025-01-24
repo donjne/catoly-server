@@ -12,6 +12,7 @@ import { AdminModule } from './admin/admin.module';
 import { WhitelistModule } from './whitelist/whitelist.module';
 import { ChatModule } from './chat/chat.module';
 import { MongooseModule } from '@nestjs/mongoose';
+import { UserModule } from './user/user.module';
 
 
 @Module({
@@ -41,6 +42,7 @@ import { MongooseModule } from '@nestjs/mongoose';
     WhitelistModule,
     AdminModule,
     ChatModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
