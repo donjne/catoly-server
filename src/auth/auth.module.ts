@@ -4,11 +4,20 @@ import { ConfigModule } from '@nestjs/config';
 import { PrivyService } from './privy.service';
 import { AuthController } from './auth.controller';
 import { PrivyAuthGuard } from './privy.guard';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthService } from './auth.service';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    ConfigModule,
+    JwtModule.register({
+      global: true,
+      secret: process.env.JWT_ACCESS_TOKEN_SECRET,
+      signOptions: { expiresIn: '60s' }, // 1min
+    }),
+  ],
   controllers: [AuthController],
-  providers: [PrivyService, PrivyAuthGuard],
-  exports: [PrivyService, PrivyAuthGuard],
+  providers: [PrivyService, PrivyAuthGuard, AuthService],
+  exports: [PrivyService, PrivyAuthGuard, ],
 })
 export class AuthModule {}

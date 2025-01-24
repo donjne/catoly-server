@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -13,6 +14,8 @@ async function bootstrap() {
     // Global exception filter
     app.useGlobalFilters();
 
+    app.use(cookieParser());
+    
     // Enable CORS
     app.enableCors({
       origin: true,
