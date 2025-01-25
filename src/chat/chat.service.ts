@@ -293,6 +293,36 @@ export class ChatService {
     });
   }
 
+  getMockStreamingResponse(question: string): Observable<string> {
+    const mockResponses = {
+      default:
+        "I apologize, but I don't have enough context to provide a specific answer.",
+      greeting: 'Hello! How can I assist you today?',
+      help: 'I can help you with various tasks. What would you like to know?',
+      code: "Here's an example code:\n```typescript\nconst hello = () => {\n  console.log('Hello world');\n}\n```",
+    };
+
+    return new Observable((subscriber) => {
+      const words = (
+        mockResponses[question.toLowerCase()] || mockResponses.default
+      ).split(' ');
+
+      let currentIndex = 0;
+
+      const interval = setInterval(() => {
+        if (currentIndex < words.length) {
+          subscriber.next(words[currentIndex] + ' ');
+          currentIndex++;
+        } else {
+          clearInterval(interval);
+          subscriber.complete();
+        }
+      }, 200);
+
+      return () => clearInterval(interval);
+    });
+  }
+
   async deleteMessage(messageId: string, userId: string) {
     const message = await this.messageModel.findById(messageId);
 

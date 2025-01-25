@@ -122,9 +122,9 @@ export class ChatController {
     }
   }
 
-  @Get('stream')
+  @Post('stream')
   async streamResponse(
-    @Query('question') question: string,
+    @Body('question') question: string,
     @Res() response: ExpressResponse,
   ): Promise<void> {
     response.setHeader('Content-Type', 'text/event-stream');
@@ -133,10 +133,31 @@ export class ChatController {
 
     this.chatService.getStreamingAIResponse(question).subscribe({
       next: (chunk) => {
+        response.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+      },
+      error: (error) => {
+        response.end();
+      },
+      complete: () => {
+        response.end();
+      },
+    });
+  }
+
+  @Post('mock-stream')
+  async mockStreamResponse(
+    @Body('question') question: string,
+    @Res() response: ExpressResponse,
+  ): Promise<void> {
+    response.setHeader('Content-Type', 'text/event-stream');
+    response.setHeader('Cache-Control', 'no-cache');
+    response.setHeader('Connection', 'keep-alive');
+
+    this.chatService.getMockStreamingResponse(question).subscribe({
+      next: (chunk) => {
         response.write(chunk);
       },
       error: (error) => {
-        console.error('Stream error:', error);
         response.end();
       },
       complete: () => {
