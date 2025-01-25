@@ -15,7 +15,7 @@ export class AuthController {
     @Get('status')
     async checkUserAuth(@Req() request: Request): Promise<responseObect> {
         try {
-            const token = request.cookies[REFRESH_TOKEN]
+            const token = (request.get(REFRESH_TOKEN) && decodeURIComponent(request.get(REFRESH_TOKEN))) || request.cookies[REFRESH_TOKEN]
             if(!token) throw new UnauthorizedException()
             const claims = await this.authService.verifyJwt(token, REFRESH_TOKEN_ENV)
             const accessToken = await this.jwtService.signAsync(

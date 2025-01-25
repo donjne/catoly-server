@@ -184,12 +184,7 @@ export class DasService {
       }
 
       const rpcUrl = await this.getRpcUrl(params.ownerAddress, params.network);
-      const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await axios.post(rpcUrl, {
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getAssetsByOwner',
@@ -200,18 +195,22 @@ export class DasService {
             options: {
               showNativeBalance: true,
             },
+          }},
+        {
+          headers: {
+            'Content-Type': 'application/json',
           },
-        }),
-      });
+        }
+      )
 
-      if (!response.ok) {
-        throw new HttpException(
-          'Failed to fetch native balance from Helius',
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
+      // if (!response.ok) {
+      //   throw new HttpException(
+      //     'Failed to fetch native balance from Helius',
+      //     HttpStatus.BAD_GATEWAY,
+      //   );
+      // }
 
-      const data = (await response.json()) as NativeBalanceResponse;
+      const data = (await response.data) as NativeBalanceResponse;
 
       console.log(data);
 

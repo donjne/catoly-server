@@ -17,13 +17,14 @@ export class UserService {
         private jwtService: JwtService
     ){}
 
-    async getOrCreateNewUser({address, email = "" }: CreateUserPayload): Promise<User> {
+    async getOrCreateNewUser({address, email }: CreateUserPayload): Promise<User> {
+        
         const foundUser = await this.userModel.findOne({ address }).lean()
         if (!foundUser) {
             return (await this.userModel.create({ address, email })).toObject();
         }
 
-        return foundUser
+        return foundUser 
 
     }
 
