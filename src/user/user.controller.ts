@@ -24,7 +24,8 @@ export class UserController {
 
             response.cookie('refresh_token', refreshToken, {
                 httpOnly: true,
-                maxAge: 60 * 15 * 1000, //15mins
+                maxAge: 60 * 1000, //15mins
+                // maxAge: 60 * 15 * 1000, //15mins
                 secure: false,
                 sameSite: 'lax',
                 path: '/'

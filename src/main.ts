@@ -15,13 +15,18 @@ async function bootstrap() {
     app.useGlobalFilters();
 
     app.use(cookieParser());
-    
+
     // Enable CORS
     app.enableCors({
-      origin: ['http://localhost:3000', 'https://toly-lemon.vercel.app', 'https://toly-two.vercel.app'],
+      origin: [
+        'http://localhost:3000',
+        'https://toly-lemon.vercel.app',
+        'https://toly-two.vercel.app',
+        'https://3000-mctursh-toly-yu82cgs694m.ws-eu117.gitpod.io',
+      ],
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: '*',
-      credentials: true,
+      credentials: false,
     });
 
     // Start the application
