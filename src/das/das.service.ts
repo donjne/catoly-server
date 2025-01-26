@@ -44,6 +44,8 @@ import {
   GetWalletPortfolioParams,
   GetBalanceParams,
   GetCompleteBalanceParams,
+  FilteredAsset,
+  GetAssetsByOwnerResponseWithFiltered,
 } from './das.types';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getAllTld, TldParser } from '@onsol/tldparser';
@@ -128,7 +130,7 @@ export class DasService {
     }
   }
 
-  private calculateTokenValue(asset: Asset): {
+  private calculateTokenValue(asset: FilteredAsset | Asset): {
     name: string;
     image: string;
     symbol: string;
@@ -154,9 +156,9 @@ export class DasService {
       const value = actualBalance * pricePerToken;
 
       return {
-        name: asset.content.metadata.name,
-        image: asset.content.links.image,
-        symbol: asset.content.metadata.symbol,
+        name: asset.metadata.name,
+        image: asset.links.image,
+        symbol: asset.metadata.symbol,
         balance: actualBalance,
         decimals,
         pricePerToken,
@@ -165,7 +167,7 @@ export class DasService {
       };
     } catch (error) {
       console.error(
-        `Error calculating value for token ${asset.content?.metadata?.symbol}:`,
+        `Error calculating value for token ${asset.metadata?.symbol}:`,
         error,
       );
       return null;
@@ -184,7 +186,9 @@ export class DasService {
       }
 
       const rpcUrl = await this.getRpcUrl(params.ownerAddress, params.network);
-      const response = await axios.post(rpcUrl, {
+      const response = await axios.post(
+        rpcUrl,
+        {
           jsonrpc: '2.0',
           id: 'helius-das',
           method: 'getAssetsByOwner',
@@ -195,13 +199,14 @@ export class DasService {
             options: {
               showNativeBalance: true,
             },
-          }},
+          },
+        },
         {
           headers: {
             'Content-Type': 'application/json',
           },
-        }
-      )
+        },
+      );
 
       // if (!response.ok) {
       //   throw new HttpException(
@@ -364,9 +369,12 @@ export class DasService {
     }
   }
 
-  async getFungibleTokensByOwner(params: GetAssetsByOwnerParams) {
+  async getFungibleTokensByOwner(
+    params: GetAssetsByOwnerParams,
+    verbose = false,
+  ): Promise<GetAssetsByOwnerResponseWithFiltered> {
     try {
-      const { ownerAddress, page = 1, limit = 100, before, after } = params;
+      const { ownerAddress, page = 1, limit = 3, before, after } = params;
 
       if (!ownerAddress) {
         throw new HttpException(
@@ -433,6 +441,35 @@ export class DasService {
       // Apply the original limit after filtering
       const limitedTokens = fungibleTokens.slice(0, limit);
 
+      //filter unused fields to reduce tokens passed to llm
+
+      if (!verbose) {
+        const filtered = limitedTokens.map(
+          ({
+            id,
+            interface: interfaceType,
+            content: { metadata, links },
+            compression: { compressed },
+            authorities: [{ address }],
+            token_info,
+          }) => ({
+            id,
+            interface: interfaceType,
+            metadata,
+            links,
+            address,
+            compressed,
+            token_info,
+          }),
+        );
+        return {
+          ...data.result,
+          items: filtered,
+          total: fungibleTokens.length,
+          limit: limit,
+        };
+      }
+
       return {
         ...data.result,
         items: limitedTokens,
@@ -460,12 +497,15 @@ export class DasService {
       const limit = 100;
 
       while (true) {
-        const response = await this.getFungibleTokensByOwner({
-          ownerAddress: params.ownerAddress,
-          limit,
-          page,
-          network: params.network,
-        });
+        const response = await this.getFungibleTokensByOwner(
+          {
+            ownerAddress: params.ownerAddress,
+            limit,
+            page,
+            network: params.network,
+          },
+          false,
+        );
 
         const tokens = response.items
           .filter((asset) => asset.interface === 'FungibleToken')

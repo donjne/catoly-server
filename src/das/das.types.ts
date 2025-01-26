@@ -38,13 +38,56 @@ export interface TokenInfo {
   price_info?: PriceInfo;
 }
 
+interface Content {
+  $schema: string;
+  json_uri: string;
+  files: Array<{
+    uri: string;
+    cdn_uri: string;
+    mime: string;
+  }>;
+  metadata: {
+    description: string;
+    name: string;
+    symbol: string;
+    token_standard: string;
+  };
+  links: {
+    image: string;
+  };
+}
+
+interface Compression {
+  eligible: boolean;
+  compressed: boolean;
+  data_hash: string;
+  creator_hash: string;
+  asset_hash: string;
+  tree: string;
+  seq: number;
+  leaf_id: number;
+}
+
+interface Ownership {
+  frozen: boolean;
+  delegated: boolean;
+  delegate: string | null;
+  ownership_model: string;
+  owner: string;
+}
+
+interface Authority {
+  address: string;
+  scopes: string[];
+}
+
 export interface Asset {
   interface: 'V1_NFT' | 'FungibleToken' | string;
   id: string;
-  content: any;
-  authorities: string[];
-  compression: any;
-  ownership: any;
+  content: Content;
+  authorities: Authority[];
+  compression: Compression;
+  ownership: Ownership;
   supply: any;
   creators: any[];
   grouping: any[];
@@ -53,6 +96,27 @@ export interface Asset {
   burnt: boolean;
   token_info?: TokenInfo;
   [key: string]: any;
+}
+
+export interface FilteredAsset {
+  interface: 'V1_NFT' | 'FungibleToken' | string;
+  id: string;
+  metadata: Content['metadata'];
+  links?: {
+    image: string;
+  };
+  address: string;
+  compressed: boolean;
+  token_info?: TokenInfo;
+}
+
+export interface GetAssetsByOwnerResponseWithFiltered {
+  items: Asset[] | FilteredAsset[];
+  total: number;
+  limit: number;
+  page: number;
+  before: string | null;
+  after: string | null;
 }
 
 export interface GetAssetsByOwnerResponse {
@@ -240,7 +304,7 @@ export interface TransactionsResponse {
   status: 'success' | 'error';
   message?: string;
   oldest?: string;
-  result?: any[];  
+  result?: any[];
 }
 
 export interface TPSResponse {
