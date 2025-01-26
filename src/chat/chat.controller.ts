@@ -133,7 +133,7 @@ export class ChatController {
 
     this.chatService.getStreamingAIResponse(question).subscribe({
       next: (chunk) => {
-        response.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+        response.write(chunk);
       },
       error: (error) => {
         response.end();
