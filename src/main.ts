@@ -23,6 +23,7 @@ async function bootstrap() {
         'https://toly-lemon.vercel.app',
         'https://toly-two.vercel.app',
         'https://3000-mctursh-toly-yu82cgs694m.ws-eu117.gitpod.io',
+        'https://www.catoly.ai'
       ],
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: '*',
