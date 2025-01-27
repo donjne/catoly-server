@@ -15,6 +15,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { catchError, firstValueFrom, map, Observable } from 'rxjs';
 import axios, { AxiosResponse } from 'axios';
+import { ChatEvent } from './chat.type';
 
 @Injectable()
 export class ChatService {
@@ -250,13 +251,15 @@ export class ChatService {
 
   getStreamingAIResponse(question: string): Observable<any> {
     return new Observable((subscriber) => {
+      let streamdContent = '';
+
       this.httpService
         .axiosRef({
           method: 'POST',
           url: 'https://chat.catoly.ai/agent',
           data: {
             question,
-            thread_id: 0,
+            thread_id: 1,
           },
           headers: {
             'Content-Type': 'application/json',
@@ -267,17 +270,38 @@ export class ChatService {
           response.data.on('data', (chunk: Buffer) => {
             try {
               const text = chunk.toString('utf-8');
-              subscriber.next(text);
+
+              const jsonStr = text.slice(6);
+
+              try {
+                const {
+                  event,
+                  data,
+                  metadata: { langgraph_node },
+                } = JSON.parse(jsonStr) as ChatEvent;
+
+                if (
+                  text.startsWith('data: ') &&
+                  event === 'on_chat_model_stream' &&
+                  langgraph_node
+                ) {
+                  const text = data.chunk?.content;
+                  streamdContent += text;
+                  subscriber.next(text);
+                }
+              } catch {}
             } catch (error) {
               console.error('Error processing chunk:', error);
             }
           });
 
           response.data.on('end', () => {
+            console.log('Complete response:', streamdContent);
             subscriber.complete();
           });
 
           response.data.on('error', (error) => {
+            console.log('Complete response:', streamdContent);
             subscriber.error(error);
           });
         })
