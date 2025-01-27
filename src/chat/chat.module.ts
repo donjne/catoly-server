@@ -4,19 +4,23 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { 
+  AIThread,
+  AIThreadSchema,
   Conversation, 
   ConversationSchema,
-  Message,
-  MessageSchema 
 } from './schemas/conversation.schema';
 import { AuthModule } from '../auth/auth.module';
 import { HttpModule } from '@nestjs/axios';
+import { User, UserSchema } from 'src/user/schema/user.schema';
+import { Message, MessageSchema } from './schemas/message.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Conversation.name, schema: ConversationSchema },
-      { name: Message.name, schema: MessageSchema }
+      { name: Message.name, schema: MessageSchema },
+      { name: User.name, schema: UserSchema },
+      { name: AIThread.name, schema: AIThreadSchema }
     ]),
     AuthModule,
     HttpModule

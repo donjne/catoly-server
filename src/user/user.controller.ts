@@ -18,7 +18,7 @@ export class UserController {
         ): Promise<responseObect> {
         try {
             const data = await this.userService.loginUser(loginUserPayload)
-            const payload = { sub: data['_id'], address: data.address, email: data.email };
+            const payload = { id: data['_id'], address: data.address, email: data.email };
 
             const { accessToken, refreshToken } = await this.userService.signUserdataWithJwt(payload)
 

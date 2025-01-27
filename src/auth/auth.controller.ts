@@ -20,8 +20,9 @@ export class AuthController {
             const claims = await this.authService.verifyJwt(token, REFRESH_TOKEN_ENV)
             const accessToken = await this.jwtService.signAsync(
               {
-                sub: claims.sub,
-                address: claims.address
+                id: claims.id,
+                address: claims.address,
+                email: claims.email
               }
             )
             return { message: "User Authenticated", data: { ...claims, accessToken}, }
