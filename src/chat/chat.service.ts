@@ -364,7 +364,7 @@ export class ChatService {
           });
 
           response.data.on('error', (error) => {
-            console.log('Complete response:', streamdContent);
+            // console.log('Complete response:', streamdContent);
             subscriber.error(error);
           });
         })

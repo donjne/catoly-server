@@ -149,7 +149,7 @@ export class ChatController {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('Connection', 'keep-alive');
-    const AIResponse = ''
+    let AIResponse = ''
     
     const user = request['user'];
     // console.log(user);
@@ -175,20 +175,23 @@ export class ChatController {
 
     this.chatService.getStreamingAIResponse(question, newThreadId).subscribe({
       next: (chunk) => {
-        AIResponse.concat(chunk)
+        AIResponse += chunk
         response.write(chunk);
       },
       error: (error) => {
         response.end();
       },
       complete: async () => {
-        await this.chatService.addMessage({
-          content: AIResponse,
-          role: 'assistant',
-          conversation: newConversationId,
-          userId: user.id
-        })
-        response.end();
+        
+        response.end(async () => {
+          await this.chatService.addMessage({
+            content: AIResponse,
+            role: 'assistant',
+            conversation: newConversationId,
+            userId: user.id
+          })
+        });
+        
       },
     });
   }
