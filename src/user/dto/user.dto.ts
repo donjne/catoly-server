@@ -8,8 +8,9 @@ export class User {
 export class CreateUserPayload extends User {}
 
 export class userJwtData {
-    sub: ObjectId
+    id: ObjectId
     address: string
+    email: string
 }
 
 export class responseObect {

@@ -16,24 +16,33 @@ import {
   NotFoundException,
   Sse,
   Res,
+  Req,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { PrivyAuthGuard } from '../auth/privy.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Observable } from 'rxjs';
 import { map, catchError, finalize } from 'rxjs/operators';
-import { Response as ExpressResponse } from 'express';
+import { Response as ExpressResponse, Request } from 'express';
+import { AuthGuard } from 'src/guard/auth.guard';
+import { User } from 'src/user/schema/user.schema';
+import { Message } from './schemas/message.schema';
+import { Conversation } from './schemas/conversation.schema';
+import { AddMessageProps } from './chat.dto';
 
 @Controller('chat')
-// @UseGuards(PrivyAuthGuard)
+@UseGuards(AuthGuard)
 export class ChatController {
   constructor(private chatService: ChatService) {}
 
-  @Post('conversations')
-  async createConversation() {
+  @Post('create-conversations')
+  async createConversation(
+    @Req() request: Request
+  ) {
+    const user = request['user']
     try {
-      const randomUserId = `user_${Math.floor(Math.random() * 1000000)}`;
-      return await this.chatService.createConversation(randomUserId);
+      // const randomUserId = `user_${Math.floor(Math.random() * 1000000)}`;
+      return await this.chatService.createConversation(user.id);
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to create conversation',
@@ -44,12 +53,16 @@ export class ChatController {
 
   @Get('conversations')
   async getConversations(
-    @GetUser() user: any,
+    // @GetUser() user: any,
+    @Req() request: Request,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     try {
-      return await this.chatService.getConversations(user.sub, page, limit);
+      const user = request['user']
+      console.log(user);
+      
+      return await this.chatService.getConversations(user.id, page, limit);
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to get conversations',
@@ -58,16 +71,19 @@ export class ChatController {
     }
   }
 
-  @Get('conversations/:threadId')
+  @Get('conversations/:conversationId')
   async getConversation(
-    @GetUser() user: any,
-    @Param('threadId') threadId: string,
+    // @GetUser() user: any,
+    @Req() request: Request,
+    @Param('conversationId') threadId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ) {
+  ){
+  // : Promise<Message[]> {
     try {
+      const user = request['user']
       return await this.chatService.getConversation(
-        user.sub,
+        user.id,
         threadId,
         page,
         limit,
@@ -125,21 +141,57 @@ export class ChatController {
   @Post('stream')
   async streamResponse(
     @Body('question') question: string,
+    @Param('conversationId') conversation: string,
+    @Param('threadId') threadId: number,
     @Res() response: ExpressResponse,
-  ): Promise<void> {
+    @Req() request: Request
+  ): Promise<any> {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('Connection', 'keep-alive');
+    let AIResponse = ''
+    
+    const user = request['user'];
+    // console.log(user);
+    // return user
+    let newConversation: Conversation;
+    let newThreadId: number = threadId
+    let newConversationId: string = conversation
 
-    this.chatService.getStreamingAIResponse(question).subscribe({
+    if(!conversation){
+      newConversation = await this.chatService.createConversation(user.id)
+      newThreadId = newConversation.threadId
+      newConversationId = newConversation['_id']
+    }
+
+    const chatPayload: AddMessageProps = {
+      content: question,
+      role: 'user',
+      conversation: newConversationId,
+      userId: user.id
+    }
+
+    await this.chatService.addMessage(chatPayload) 
+
+    this.chatService.getStreamingAIResponse(question, newThreadId).subscribe({
       next: (chunk) => {
+        AIResponse += chunk
         response.write(chunk);
       },
       error: (error) => {
         response.end();
       },
-      complete: () => {
-        response.end();
+      complete: async () => {
+        
+        response.end(async () => {
+          await this.chatService.addMessage({
+            content: AIResponse,
+            role: 'assistant',
+            conversation: newConversationId,
+            userId: user.id
+          })
+        });
+        
       },
     });
   }
@@ -181,55 +233,55 @@ export class ChatController {
     }
   }
 
-  @Delete('messages/:id')
-  async deleteMessage(@Param('id') messageId: string, @GetUser() user: any) {
-    try {
-      return await this.chatService.deleteMessage(messageId, user.sub);
-    } catch (error) {
-      throw new HttpException(
-        error.message || 'Failed to delete message',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
+  // @Delete('messages/:id')
+  // async deleteMessage(@Param('id') messageId: string, @GetUser() user: any) {
+  //   try {
+  //     return await this.chatService.deleteMessage(messageId, user.sub);
+  //   } catch (error) {
+  //     throw new HttpException(
+  //       error.message || 'Failed to delete message',
+  //       error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+  //     );
+  //   }
+  // }
 
-  @Post('messages/:id/react')
-  async reactToMessage(
-    @Param('id') messageId: string,
-    @Body() data: { emoji: string },
-    @GetUser() user: any,
-  ) {
-    try {
-      return await this.chatService.addReaction(
-        messageId,
-        data.emoji,
-        user.sub,
-      );
-    } catch (error) {
-      throw new HttpException(
-        error.message || 'Failed to add reaction',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
+  // @Post('messages/:id/react')
+  // async reactToMessage(
+  //   @Param('id') messageId: string,
+  //   @Body() data: { emoji: string },
+  //   @GetUser() user: any,
+  // ) {
+  //   try {
+  //     return await this.chatService.addReaction(
+  //       messageId,
+  //       data.emoji,
+  //       user.sub,
+  //     );
+  //   } catch (error) {
+  //     throw new HttpException(
+  //       error.message || 'Failed to add reaction',
+  //       error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+  //     );
+  //   }
+  // }
 
-  @Put('messages/:id')
-  async editMessage(
-    @Param('id') messageId: string,
-    @Body() data: { content: string },
-    @GetUser() user: any,
-  ) {
-    try {
-      return await this.chatService.editMessage(
-        messageId,
-        data.content,
-        user.sub,
-      );
-    } catch (error) {
-      throw new HttpException(
-        error.message || 'Failed to edit message',
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
+  // @Put('messages/:id')
+  // async editMessage(
+  //   @Param('id') messageId: string,
+  //   @Body() data: { content: string },
+  //   @GetUser() user: any,
+  // ) {
+  //   try {
+  //     return await this.chatService.editMessage(
+  //       messageId,
+  //       data.content,
+  //       user.sub,
+  //     );
+  //   } catch (error) {
+  //     throw new HttpException(
+  //       error.message || 'Failed to edit message',
+  //       error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+  //     );
+  //   }
+  // }
 }

@@ -1,71 +1,72 @@
 // src/chat/schemas/conversation.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { models } from 'mongoose';
 import { Document, Types } from 'mongoose';
+import { User } from 'src/user/schema/user.schema';
+import { Message } from './message.schema';
 
-export type MessageDocument = Message & Document;
 export type ConversationDocument = Conversation & Document;
 
-@Schema()
-class ReactionSchema {
-  @Prop({ required: true })
-  emoji: string;
+// @Schema()
+// class ReactionSchema {
+//   @Prop({ required: true })
+//   emoji: string;
 
-  @Prop({ required: true, default: 1 })
-  count: number;
+//   @Prop({ required: true, default: 1 })
+//   count: number;
 
-  @Prop([String])
-  users: string[];
-}
-
-@Schema({ timestamps: true })
-export class Message {
-  @Prop({ type: Types.ObjectId })
-  _id: Types.ObjectId;
-
-  @Prop({ required: true })
-  content: string;
-
-  @Prop({ required: true, enum: ['user', 'assistant'] })
-  role: 'user' | 'assistant';
-
-  @Prop({ required: false })
-  userId: string;
-
-  @Prop({ default: Date.now })
-  timestamp: Date;
-
-  @Prop({ type: Date })
-  editedAt?: Date;
-
-  @Prop({ type: [ReactionSchema], default: [] })
-  reactions: ReactionSchema[];
-}
+//   @Prop([String])
+//   users: string[];
+// }
 
 @Schema({ timestamps: true })
 export class Conversation {
-  @Prop({ required: true })
-  userId: string;
+  // @Prop({ required: true })
+  // userId: string;
+  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
+  userId: User;
 
   @Prop({ required: true, unique: true, type: Number })  
   threadId: number;
 
-  @Prop({ default: true })
-  isActive: boolean;
+  @Prop({ 
+    type: Types.ObjectId, 
+    ref: 'Message',
+    default: null 
+  })
+  lastMessage: Message;
 
-  @Prop({ type: [{ type: Message }], default: [] })
-  messages: Message[];
+  // @Prop({ default: true })
+  // isActive: boolean;
 
-  @Prop()
-  lastMessage: string;
+  // @Prop({ type: [{ type: Message }], default: [] })
+  // messages: Message[];
+  // @Prop({ type: [{ type: Types.ObjectId, ref: 'Message' }] })
+  // messages: Message[];
 
-  @Prop({ default: Date.now })
-  lastMessageAt: Date;
+  // @Prop()
+  // lastMessage: string;
 }
 
-const MessageSchema = SchemaFactory.createForClass(Message);
+@Schema()
+export class AIThread {
+  @Prop({ unique: true, default: 'default' })
+  name: string
+
+  @Prop({
+    unique: true,
+    index: true 
+  })
+  threadCount: number
+}
+
+
+const AIThreadSchema = SchemaFactory.createForClass(AIThread)
+
 const ConversationSchema = SchemaFactory.createForClass(Conversation);
 
+ConversationSchema.index({ user: 1 });
 
-ConversationSchema.index({ userId: 1 });
 
-export { MessageSchema, ConversationSchema };
+
+export { ConversationSchema, AIThreadSchema };
