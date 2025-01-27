@@ -18,6 +18,7 @@ import { User } from 'src/user/schema/user.schema';
 import { AddMessageProps } from './chat.dto';
 import { Message, MessageDocument, MessageType } from './schemas/message.schema';
 import { ObjectId } from 'typeorm';
+import { ChatEvent } from './chat.type';
 
 @Injectable()
 export class ChatService {
@@ -313,6 +314,8 @@ export class ChatService {
 
   getStreamingAIResponse(question: string, thread_id: number): Observable<any> {
     return new Observable((subscriber) => {
+      let streamdContent = '';
+
       this.httpService
         .axiosRef({
           method: 'POST',
@@ -330,17 +333,38 @@ export class ChatService {
           response.data.on('data', (chunk: Buffer) => {
             try {
               const text = chunk.toString('utf-8');
-              subscriber.next(text);
+
+              const jsonStr = text.slice(6);
+
+              try {
+                const {
+                  event,
+                  data,
+                  metadata: { langgraph_node },
+                } = JSON.parse(jsonStr) as ChatEvent;
+
+                if (
+                  text.startsWith('data: ') &&
+                  event === 'on_chat_model_stream' &&
+                  langgraph_node
+                ) {
+                  const text = data.chunk?.content;
+                  streamdContent += text;
+                  subscriber.next(text);
+                }
+              } catch {}
             } catch (error) {
               console.error('Error processing chunk:', error);
             }
           });
 
           response.data.on('end', () => {
+            console.log('Complete response:', streamdContent);
             subscriber.complete();
           });
 
           response.data.on('error', (error) => {
+            console.log('Complete response:', streamdContent);
             subscriber.error(error);
           });
         })
