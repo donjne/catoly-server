@@ -42,7 +42,8 @@ export class ChatController {
     const user = request['user']
     try {
       // const randomUserId = `user_${Math.floor(Math.random() * 1000000)}`;
-      return await this.chatService.createConversation(user.id);
+      const data =  await this.chatService.createConversation(user.id);
+      return { message: "Successfully Created conversation", data: data.toObject() }
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to create conversation',
@@ -75,7 +76,7 @@ export class ChatController {
   async getConversation(
     // @GetUser() user: any,
     @Req() request: Request,
-    @Param('conversationId') threadId: string,
+    @Param('conversationId') conversationId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ){
@@ -84,7 +85,7 @@ export class ChatController {
       const user = request['user']
       return await this.chatService.getConversation(
         user.id,
-        threadId,
+        conversationId,
         page,
         limit,
       );
@@ -141,8 +142,8 @@ export class ChatController {
   @Post('stream')
   async streamResponse(
     @Body('question') question: string,
-    @Param('conversationId') conversation: string,
-    @Param('threadId') threadId: number,
+    @Query('conversationId') conversation: string,
+    @Query('threadId') threadId: string,
     @Res() response: ExpressResponse,
     @Req() request: Request
   ): Promise<any> {
@@ -152,10 +153,9 @@ export class ChatController {
     let AIResponse = ''
     
     const user = request['user'];
-    // console.log(user);
-    // return user
+
     let newConversation: Conversation;
-    let newThreadId: number = threadId
+    let newThreadId: number = Number(threadId)
     let newConversationId: string = conversation
 
     if(!conversation){
@@ -171,7 +171,8 @@ export class ChatController {
       userId: user.id
     }
 
-    await this.chatService.addMessage(chatPayload) 
+    await this.chatService.addMessage(chatPayload)
+    
 
     this.chatService.getStreamingAIResponse(question, newThreadId).subscribe({
       next: (chunk) => {
@@ -182,16 +183,20 @@ export class ChatController {
         response.end();
       },
       complete: async () => {
-        
-        response.end(async () => {
-          await this.chatService.addMessage({
-            content: AIResponse,
-            role: 'assistant',
-            conversation: newConversationId,
-            userId: user.id
-          })
-        });
-        
+        if(AIResponse){
+          response.end(async () => {
+            await this.chatService.addMessage({
+              content: AIResponse,
+              role: 'assistant',
+              conversation: newConversationId,
+              userId: user.id
+            })
+          });
+        } else {
+          // Alert the failure of the  Model
+          console.warn("Content didn't return content")
+        }
+
       },
     });
   }

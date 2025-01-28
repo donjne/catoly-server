@@ -68,27 +68,27 @@ export class ChatService {
 
   async getConversation(
     userId: string,
-    threadId: string,
+    conversationId: string,
     page = 1,
     limit = 20,
   ) {
     // const conversation = await this.conversationModel
-    //   .findOne({ userId, threadId })
+    //   .findOne({ userId, conversationId })
     //   .exec();
     try {
       const messages = await this.messageModel
         // .find({ userId: '6792d0075149ce750e57aada' })
-        // .find({ userId, conversation: threadId })
-        // .find({ conversation: threadId, userId })
+        // .find({ userId, conversation: conversationId })
+        // .find({ conversation: conversationId, userId })
         // .find({ userId,  })
-        .find({ conversation: new Types.ObjectId(threadId), userId })
+        .find({ conversation: conversationId, userId })
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .populate('userId')
         .exec();
   
-      if (!threadId) {
+      if (!conversationId) {
         throw new NotFoundException('Conversation not found');
       }
   
@@ -105,6 +105,7 @@ export class ChatService {
   
       return {
         // ...conversation.toObject(),
+        message: "Successfully fetched messages",
         messages,
         // hasMore: skip + limit < conversation.messages.length,
         // total: conversation.messages.length,
