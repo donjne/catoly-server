@@ -82,7 +82,7 @@ export class ChatService {
         // .find({ conversation: conversationId, userId })
         // .find({ userId,  })
         .find({ conversation: conversationId, userId })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: "asc" })
         .skip((page - 1) * limit)
         .limit(limit)
         .populate('userId')
