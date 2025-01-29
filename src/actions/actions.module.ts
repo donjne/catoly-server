@@ -2,11 +2,12 @@
 import { Module } from '@nestjs/common';
 import { ActionsController } from './actions.controller';
 import { ActionsService } from './actions.service';
+import { VaultService } from 'src/vault/vault.service';
+import { RedisService } from 'src/redis/redis.service';
 
 @Module({
   controllers: [ActionsController],
-  providers: [ActionsService],
+  providers: [ActionsService, VaultService, RedisService],
   exports: [ActionsService],
 })
-
 export class ActionsModule {}

@@ -26,7 +26,6 @@ import {
   MintNFTOptions,
   NFTListingOptions,
   NFTListingResponse,
-  NFTMetadata,
   PumpfunLaunchResponse,
   PumpFunTokenOptions,
   RPSGameOptions,
@@ -42,6 +41,7 @@ import {
   TransferResponse,
 } from './actions.types';
 import { Keypair, PublicKey } from '@solana/web3.js';
+import bs58 from 'bs58';
 
 @Controller('actions')
 export class ActionsController {
@@ -102,11 +102,11 @@ export class ActionsController {
       } & PumpFunTokenOptions;
     },
   ): Promise<PumpfunLaunchResponse> {
-    const walletKeypair = Keypair.fromSecretKey(
-      Buffer.from(JSON.parse(body.walletKeypair)),
+    //validate user sesh
+    return this.actionsService.launchPumpFunToken(
+      body.walletKeypair,
+      body.options,
     );
-
-    return this.actionsService.launchPumpFunToken(walletKeypair, body.options);
   }
 
   @Post('lend/usdc')
