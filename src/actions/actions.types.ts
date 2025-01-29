@@ -1,4 +1,4 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey } from '@solana/web3.js';
 
 export type ImageSize = '256x256' | '512x512' | '1024x1024';
 
@@ -172,4 +172,201 @@ export interface RPSGameOptions extends BaseOptions {
 
 export interface RPSGameResponse {
   outcome: string;
+}
+
+/// rug check details
+interface IMintAccount {
+  mintAuthority: string | null;
+  supply: number;
+  decimals: number;
+  isInitialized: boolean;
+  freezeAuthority: null;
+}
+
+interface ITokenMeta {
+  name: string;
+  symbol: string;
+  uri: string;
+  mutable: boolean;
+  updateAuthority: string;
+}
+
+export interface ITokenHolder {
+  address: string;
+  amount: number;
+  decimals: number;
+  pct: number;
+  uiAmount: number;
+  uiAmountString: string;
+  owner: string;
+  insider: boolean;
+}
+
+interface IRisk {
+  name: string;
+  value: string;
+  description: string;
+  score: number;
+  level: string;
+}
+
+interface IFileMeta {
+  description: string;
+  name: string;
+  symbol: string;
+  image: string;
+}
+
+interface ITransferFee {
+  pct: number;
+  maxAmount: number;
+  authority: string;
+}
+
+interface ILiquidityAccount {
+  mint: string;
+  owner: string;
+  amount: number;
+  delegate: null;
+  state: number;
+  delegatedAmount: number;
+  closeAuthority: null;
+}
+
+interface ILPHolder {
+  address: string;
+  amount: number;
+  decimals: number;
+  pct: number;
+  uiAmount: number;
+  uiAmountString: string;
+  owner: string;
+  insider: boolean;
+}
+
+interface ILP {
+  baseMint: string;
+  quoteMint: string;
+  lpMint: string;
+  quotePrice: number;
+  basePrice: number;
+  base: number;
+  quote: number;
+  reserveSupply: number;
+  currentSupply: number;
+  quoteUSD: number;
+  baseUSD: number;
+  pctReserve: number;
+  pctSupply: number;
+  holders: ILPHolder[] | null;
+  totalTokensUnlocked: number;
+  tokenSupply: number;
+  lpLocked: number;
+  lpUnlocked: number;
+  lpLockedPct: number;
+  lpLockedUSD: number;
+  lpMaxSupply: number;
+  lpCurrentSupply: number;
+  lpTotalSupply: number;
+}
+
+export interface IMarket {
+  pubkey: string;
+  marketType: string;
+  mintA: string;
+  mintB: string;
+  mintLP: string;
+  liquidityA: string;
+  liquidityB: string;
+  mintAAccount: IMintAccount;
+  mintBAccount: IMintAccount;
+  mintLPAccount: IMintAccount;
+  liquidityAAccount: ILiquidityAccount;
+  liquidityBAccount: ILiquidityAccount;
+  lp: ILP;
+}
+
+export interface IGraphInsiderReport {
+  senders: null;
+  receivers: null;
+  totalSent: number;
+  rawGraphData: null;
+  blacklisted: boolean;
+}
+
+export interface ITokenData {
+  mint: string;
+  tokenProgram: string;
+  creator?: null;
+  token: IMintAccount;
+  tokenExtensions: null;
+  tokenMeta: ITokenMeta;
+  holderSummary: {
+    percentageOfTopHolders: number;
+    holderSummary: ISummary;
+  };
+  topHolders?: ITokenHolder[];
+  freezeAuthority?: null;
+  mintAuthority: null;
+  risks: IRisk[];
+  score: number;
+  fileMeta?: IFileMeta;
+  lockerOwners?: Record<string, unknown>;
+  lockers?: Record<string, unknown>;
+  lpLockers?: null;
+  markets?: IMarket[];
+  totalMarketLiquidity?: number;
+  totalLPProviders?: number;
+  rugged: boolean;
+  tokenType?: string;
+  transferFee?: ITransferFee;
+  knownAccounts: {
+    [key: string]: {
+      name: string;
+      type: string;
+    };
+  };
+  events?: any[];
+  verification?: null;
+  graphInsidersDetected?: number;
+  graphInsiderReport?: IGraphInsiderReport;
+  detectedAt?: string;
+}
+
+export interface ITokenResponse {
+  data: ITokenData;
+  status?: number;
+  message?: string;
+}
+
+export type TokenDataResponse = {
+  data: ITokenData;
+  status?: 200 | 400 | 404 | 500;
+  message?: string;
+};
+
+export interface HolderAnalysis {
+  address: string;
+  pct: number;
+  isMarket: boolean;
+  marketType?: string;
+  marketPubkey?: string;
+}
+
+export interface ISummary {
+  marketHoldingPct: number;
+  nonMarketHoldingPct: number;
+  marketHolders: number;
+  nonMarketHolders: number;
+}
+
+interface MarketHolder {
+  address: string;
+  pct: number;
+  marketPubkey: string;
+}
+
+export interface MarketTypeGroup {
+  totalPct: number;
+  holders: MarketHolder[];
 }
