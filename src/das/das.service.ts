@@ -732,35 +732,37 @@ export class DasService {
 
   private async fetchTokenPrice(
     tokenAddress: string,
-    options?: BaseOptions,
   ): Promise<TokenPriceResponse> {
     try {
-      const response = await fetch(
-        `https://api.jup.ag/price/v2?ids=${tokenAddress}`,
+      const response = await axios.get<any[]>(
+        `https://graphql.astralane.io/api/v1/price-by-token?tokens=${tokenAddress}`,
+        {
+          timeout: 10000,
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'Mozilla/5.0',
+            'x-api-key': process.env.ASTRALANE_KEY,
+          },
+        },
       );
 
-      if (!response.ok) {
-        throw new HttpException(
-          `Failed to fetch price: ${response.statusText}`,
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
-
-      const data = (await response.json()) as JupiterPriceResponse;
-      const priceData = data.data[tokenAddress];
-
-      if (!priceData || !priceData.price) {
-        throw new HttpException(
-          'Price data not available for the given token',
-          HttpStatus.NOT_FOUND,
-        );
+      console.log(response);
+      // Return only the data property and take the first item if it's an array
+      if (
+        !response.data ||
+        !Array.isArray(response.data) ||
+        response.data.length === 0
+      ) {
+        throw new Error('Invalid response format or no data received');
       }
 
       return {
-        price: priceData.price,
-        symbol: priceData.mintSymbol,
-        vsToken: priceData.vsToken,
-        vsTokenSymbol: priceData.vsTokenSymbol,
+        tokenAddress: response?.data[0].token,
+        name: response?.data[0].name,
+        price: response?.data[0].price_in_usd,
+        symbol: response?.data[0].symbol,
+        supply: response?.data[0].supply,
+        marketCap: response?.data[0].marketCap,
       };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -792,7 +794,7 @@ export class DasService {
         );
       }
 
-      return await this.fetchTokenPrice(params.tokenAddress, params);
+      return await this.fetchTokenPrice(params.tokenAddress);
     } catch (error) {
       console.error('Token Price Error:', {
         error,
@@ -804,7 +806,7 @@ export class DasService {
         throw error;
       }
       throw new HttpException(
-        `Failed to get token price: ${error.message}`,
+        `Failed to get token price`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -214,6 +214,19 @@ export interface TokenBalance {
   uiAmountString: string;
 }
 
+export interface TokenData {
+  timestamp: string;
+  token: string;
+  price_in_sol: number;
+  price_in_usd: number;
+  decimals: number;
+  name: string;
+  symbol: string;
+  logoURI: string;
+  marketCap: number;
+  supply: number;
+}
+
 export interface ParsedTokenAccountData {
   program: string;
   parsed: {
@@ -239,11 +252,14 @@ export interface JupiterPriceResponse {
   };
 }
 
+//tech debt +> used any because didnt have time to check types
 export interface TokenPriceResponse {
-  price: string;
+  tokenAddress: string;
+  name: string;
+  price: any;
   symbol?: string;
-  vsToken: string;
-  vsTokenSymbol: string;
+  supply: string;
+  marketCap: any;
 }
 
 export interface TLDResponse {
