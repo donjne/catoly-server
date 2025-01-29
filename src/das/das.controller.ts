@@ -128,6 +128,7 @@ export class DasController {
     return this.dasService.getCompleteWalletBalance({ ownerAddress, network });
   }
 
+  /// fix up the response endpoint
   @Get('price/:tokenAddress')
   async getPrice(
     @Param('tokenAddress') tokenAddress: string,
