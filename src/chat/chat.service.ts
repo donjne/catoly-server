@@ -1,6 +1,7 @@
 // src/chat/chat.service.ts
 import {
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import { ChatEvent } from './chat.type';
 
 @Injectable()
 export class ChatService {
+  logger = new Logger(ChatService.name)
   constructor(
     @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
@@ -343,9 +345,9 @@ export class ChatService {
                   data,
                   metadata: { langgraph_node },
                 } = JSON.parse(jsonStr) as ChatEvent;
-
                 if (
-                  text.startsWith('data: ') &&
+                  // text.startsWith('data: ') &&
+                  data?.chunk?.content &&
                   event === 'on_chat_model_stream' &&
                   langgraph_node
                 ) {
@@ -353,7 +355,9 @@ export class ChatService {
                   streamdContent += text;
                   subscriber.next(text);
                 }
-              } catch {}
+              } catch(error) {
+                this.logger.log({error}, "Failed to parse stream")
+              }
             } catch (error) {
               console.error('Error processing chunk:', error);
             }
