@@ -256,7 +256,7 @@ export class VaultService implements OnModuleInit {
 
   async retrieveWalletPrivateKey(idPubkey: string): Promise<{
     success: boolean;
-    privateKey?: Keypair | string;
+    privateKey?: Keypair;
     error?: string;
   }> {
     try {
@@ -344,6 +344,8 @@ export class VaultService implements OnModuleInit {
       try {
         const keyBytes = bs58.decode(decryptedPrivateKey);
         const decryptedKeypair = Keypair.fromSecretKey(keyBytes);
+
+        console.log(decryptedKeypair.publicKey.toBase58());
 
         return {
           success: true,
