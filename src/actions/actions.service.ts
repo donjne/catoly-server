@@ -104,6 +104,7 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { BN } from 'bn.js';
 import { TensorSwapSDK } from '@tensor-oss/tensorswap-sdk';
 import { VaultService } from 'src/vault/vault.service';
+import bs58 from 'bs58';
 
 ///line 659
 @Injectable()
@@ -1098,7 +1099,8 @@ export class ActionsService {
     };
   }
 
-  async getTokenDetailedReport(mint: string): Promise<ITokenData> {
+  //response type shape is now different from ITokenDat use Any but change in time
+  async getTokenDetailedReport(mint: string): Promise<any> {
     try {
       // Log the mint address we're checking
       console.log('Checking token mint:', mint);
@@ -1147,6 +1149,7 @@ export class ActionsService {
         token: data.token,
         tokenExtensions: data.tokenExtensions,
         tokenMeta: data.tokenMeta,
+        image: data.fileMeta.image,
         holderSummary: holderSummaryReport,
         freezeAuthority: data.freezeAuthority,
         mintAuthority: data.mintAuthority,
@@ -1829,10 +1832,110 @@ export class ActionsService {
     }
   }
 
+  async tradeTokensTx(
+    user: string,
+    options: TradeOptions,
+  ): Promise<TradeResponse> {
+    const walletKeypair = (
+      await this.vaultService.retrieveWalletPrivateKey(user)
+    ).privateKey;
+    try {
+      const connection = await this.createConnection(
+        await walletKeypair,
+        options,
+      );
+      const outputMintPubkey = new PublicKey(options.outputMint);
+      const inputMintPubkey = options.inputMint
+        ? new PublicKey(options.inputMint)
+        : this.TOKENS.SOL;
+
+      // Check if input token is native SOL
+      const isNativeSol = inputMintPubkey.equals(this.TOKENS.SOL);
+      const inputDecimals = isNativeSol
+        ? 9
+        : (await getMint(connection, inputMintPubkey)).decimals;
+
+      // Calculate scaled amount
+      const scaledAmount = options.inputAmount * Math.pow(10, inputDecimals);
+
+      console.log(scaledAmount);
+
+      // Get quote
+      const quoteResponse = await (
+        await fetch(
+          `${this.JUP_API}/quote?` +
+            `inputMint=${isNativeSol ? this.TOKENS.SOL.toString() : inputMintPubkey.toString()}` +
+            `&outputMint=${outputMintPubkey.toString()}` +
+            `&amount=${scaledAmount}` +
+            `&slippageBps=${options.slippageBps || this.DEFAULT_OPTIONS.SLIPPAGE_BPS}` +
+            '&onlyDirectRoutes=true' +
+            '&maxAccounts=20',
+        )
+      ).json();
+
+      console.log(
+        `${this.JUP_API}/quote?` +
+          `inputMint=${isNativeSol ? this.TOKENS.SOL.toString() : inputMintPubkey.toString()}` +
+          `&outputMint=${outputMintPubkey.toString()}` +
+          `&amount=${scaledAmount}` +
+          `&slippageBps=${options.slippageBps || this.DEFAULT_OPTIONS.SLIPPAGE_BPS}` +
+          '&onlyDirectRoutes=true' +
+          '&maxAccounts=20',
+      );
+
+      // Get swap transaction
+      const { swapTransaction } = await (
+        await fetch(`${this.JUP_API}/swap`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            quoteResponse,
+            userPublicKey: walletKeypair.publicKey.toString(),
+            wrapAndUnwrapSol: true,
+            dynamicComputeUnitLimit: true,
+            prioritizationFeeLamports: 'auto',
+          }),
+        })
+      ).json();
+
+      // Execute swap
+      const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
+      const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+      transaction.sign([walletKeypair]);
+
+      const signature = await connection.sendTransaction(transaction);
+
+      await connection.confirmTransaction(signature);
+
+      return { signature };
+    } catch (error) {
+      console.error('Trade Error:', {
+        error,
+        message: error.message,
+        wallet: walletKeypair.publicKey.toString(),
+        network: options.network || 'auto-detect',
+        outputMint: options.outputMint,
+      });
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        `Token swap failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   async transferTokens(
-    walletKeypair: Keypair,
+    user: string,
     options: TransferOptions,
   ): Promise<TransferResponse> {
+    const walletKeypair = (
+      await this.vaultService.retrieveWalletPrivateKey(user)
+    ).privateKey;
     try {
       const connection = await this.createConnection(walletKeypair, options);
       const recipientPubkey = new PublicKey(options.recipient);

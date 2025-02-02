@@ -17,7 +17,11 @@ import { catchError, firstValueFrom, map, Observable } from 'rxjs';
 import axios, { AxiosResponse } from 'axios';
 import { User } from 'src/user/schema/user.schema';
 import { AddMessageProps } from './chat.dto';
-import { Message, MessageDocument, MessageType } from './schemas/message.schema';
+import {
+  Message,
+  MessageDocument,
+  MessageType,
+} from './schemas/message.schema';
 import { ObjectId } from 'typeorm';
 import { ChatEvent } from './chat.type';
 
@@ -25,7 +29,8 @@ import { ChatEvent } from './chat.type';
 export class ChatService {
   logger = new Logger(ChatService.name)
   constructor(
-    @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
+    @InjectModel(Conversation.name)
+    private conversationModel: Model<ConversationDocument>,
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(AIThread.name) private aiThreadModel: Model<AIThread>,
@@ -47,7 +52,7 @@ export class ChatService {
 
       await conversation.save();
       // await session.commitTransaction()
-      return conversation
+      return conversation;
     } catch (error) {
       throw new Error(`Failed to create conversation: ${error.message}`);
     }
@@ -84,19 +89,19 @@ export class ChatService {
         // .find({ conversation: conversationId, userId })
         // .find({ userId,  })
         .find({ conversation: conversationId, userId })
-        .sort({ createdAt: "asc" })
+        .sort({ createdAt: 'asc' })
         .skip((page - 1) * limit)
         .limit(limit)
         .populate('userId')
         .exec();
-  
+
       if (!conversationId) {
         throw new NotFoundException('Conversation not found');
       }
-  
+
       // Calculate skip for pagination
       // const skip = (page - 1) * limit;
-  
+
       // Get paginated messages
       // const messages = conversation.messages
       //   .slice(skip, skip + limit)
@@ -104,27 +109,20 @@ export class ChatService {
       //     (a, b) =>
       //       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       //   );
-  
+
       return {
         // ...conversation.toObject(),
-        message: "Successfully fetched messages",
+        message: 'Successfully fetched messages',
         messages,
         // hasMore: skip + limit < conversation.messages.length,
         // total: conversation.messages.length,
       };
-      
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
-  async addMessage({
-      content,
-      role,
-      conversation, 
-      userId
-    }: AddMessageProps
-  ) {
+  async addMessage({ content, role, conversation, userId }: AddMessageProps) {
     // const message = {
     //   content,
     //   role,
@@ -137,7 +135,7 @@ export class ChatService {
       conversation,
       content: content,
       type: MessageType.TEXT,
-      role
+      role,
     });
 
     // const updatedConversation = await this.conversationModel.findOneAndUpdate(
@@ -152,18 +150,15 @@ export class ChatService {
     //   { new: true },
     // );
 
-    const convo = await this.conversationModel.findByIdAndUpdate(
-      conversation,
-      { 
-        lastMessage: message._id,
-      }
-    );
+    const convo = await this.conversationModel.findByIdAndUpdate(conversation, {
+      lastMessage: message._id,
+    });
 
     if (!convo) {
       throw new NotFoundException('Conversation not found');
     }
 
-    await message.save()
+    await message.save();
 
     return convo;
   }
@@ -187,24 +182,23 @@ export class ChatService {
 
   async getNewThreadId(): Promise<AIThread> {
     try {
-      const thread = await this.aiThreadModel.find({ name: 'default' })
+      const thread = await this.aiThreadModel.find({ name: 'default' });
       let newThread;
-      if(!thread.length){
-        newThread = new this.aiThreadModel({ threadCount: 1, name: 'default' })
-        return await newThread.save()
+      if (!thread.length) {
+        newThread = new this.aiThreadModel({ threadCount: 1, name: 'default' });
+        return await newThread.save();
       }
-  
+
       newThread = await this.aiThreadModel.findOneAndUpdate(
-        {name: 'default'},
+        { name: 'default' },
         { $inc: { threadCount: 1 } },
-        { new: true }
-      )
-  
-      return await newThread.save()
+        { new: true },
+      );
+
+      return await newThread.save();
       // await session.commitTransaction();
-      
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
@@ -359,7 +353,7 @@ export class ChatService {
                 this.logger.log({error}, "Failed to parse stream")
               }
             } catch (error) {
-              console.error('Error processing chunk:', error);
+              console.error('Stream processing error:', error);
             }
           });
 
