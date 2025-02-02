@@ -102,7 +102,6 @@ export class ActionsController {
   ): Promise<any> {
     //validate user sesh
     return {
-      instruction: `This is a request to launch a token on Pump | PumpFun | Pumpdotfun. For this request users must provide the token ticker and the token name but description is optional, they must also indicate whether they want to just create or create and buy. If all the info is provided, direct the user to sign the transaction on the Launch token UI generated`,
       tokenName: body.tokenName,
       tokenTicker: body.tokenTicker,
       description: body.description,
@@ -252,7 +251,6 @@ export class ActionsController {
   @Post('trade/swap')
   async tradeTokens(@Body() tradeData: TradeOptions): Promise<any> {
     return {
-      instruction: `This the a request to for a swap on Jupiter,  if the user askes to swap tokens both inputMint and outputMint that are not USDC or SOL, please ask the for the mint, the input amount is required and is of type float make sure its valid. OutputMint: is the amount you are swaping to and InputMint is the token you have and want to swap from. If every works well, direct the user to sign the transaction on the Swap UI generated`,
       outputMint: tradeData.outputMint,
       inputMint: tradeData.inputMint,
       inputAmount: tradeData.inputAmount,
@@ -270,7 +268,6 @@ export class ActionsController {
   async transferTokens(@Body() body: TransferOptions): Promise<any> {
     console.log(body);
     return {
-      instructions: `This is the request for a transfer of any SPL token, typically SOL or USDC. if the user askes to transfer the tokens, the required information is the amount to be transferred, the recipient's solana publickey and finally the token(mint) to transfer, if you don't know the token by mint you can request for the mint address of the token from the user.`,
       recipient: body.recipient,
       mintAddress: body.mintAddress,
       amount: body.amount,
