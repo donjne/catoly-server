@@ -13,6 +13,7 @@ import { RedisService } from 'src/redis/redis.service';
   imports: [
     MongooseModule.forFeature([{name: User.name, schema: UserSchema}]),
     // AuthModule
-  ]
+  ],
+  exports: [UserService]
 })
 export class UserModule {}

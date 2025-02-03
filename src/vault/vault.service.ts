@@ -5,13 +5,17 @@ import { VaultSecret, VaultResponse, WalletResponse } from './vault.types';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { RedisService } from 'src/redis/redis.service';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class VaultService implements OnModuleInit {
   private client: vault.client;
   private readonly logger = new Logger(VaultService.name);
 
-  constructor(private readonly redisService: RedisService) {
+  constructor(
+    private readonly redisService: RedisService,
+    private userService: UserService
+  ) {
     const options = {
       apiVersion: 'v1',
       endpoint: process.env.VAULT_ADDR || 'http://localhost:8200',
@@ -174,7 +178,12 @@ export class VaultService implements OnModuleInit {
 
       // Try storing in Redis
       try {
-        await this.redisService.setValue(`${name}`, JSON.stringify(walletData));
+        const redisPromise = this.redisService.setValue(`${name}`, JSON.stringify(walletData));
+        const mongoPromise = this.userService.setUserInAppWallet(name, inAppWallet.publicKey.toBase58())
+
+        // parallelizing the calls
+        await redisPromise
+        await mongoPromise
       } catch (redisError) {
         console.error('Redis storage failed:', redisError);
         return {
@@ -232,6 +241,7 @@ export class VaultService implements OnModuleInit {
         success: true,
         data: {
           privateKey: privateKey,
+          publicKey: inAppWallet.publicKey.toBase58(),
           createdAt: timestamp,
         },
       };

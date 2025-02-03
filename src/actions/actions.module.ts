@@ -5,10 +5,12 @@ import { ActionsService } from './actions.service';
 import { VaultService } from 'src/vault/vault.service';
 import { RedisService } from 'src/redis/redis.service';
 import { DasService } from 'src/das/das.service';
+import { UserModule } from 'src/user/user.module';
 
 @Module({
   controllers: [ActionsController],
   providers: [ActionsService, VaultService, RedisService, DasService],
   exports: [ActionsService],
+  imports: [UserModule]
 })
 export class ActionsModule {}

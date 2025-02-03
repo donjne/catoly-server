@@ -18,6 +18,7 @@ export interface WalletResponse {
   success: boolean;
   data?: {
     privateKey?: string;
+    publicKey?: string;
     createdAt?: string;
   };
   error?: string;
