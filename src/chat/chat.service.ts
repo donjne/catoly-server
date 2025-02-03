@@ -27,7 +27,7 @@ import { ChatEvent } from './chat.type';
 
 @Injectable()
 export class ChatService {
-  logger = new Logger(ChatService.name)
+  logger = new Logger(ChatService.name);
   constructor(
     @InjectModel(Conversation.name)
     private conversationModel: Model<ConversationDocument>,
@@ -311,7 +311,7 @@ export class ChatService {
 
   getStreamingAIResponse(question: string, thread_id: number): Observable<any> {
     return new Observable((subscriber) => {
-      let streamdContent = '';
+      const streamdContent = '';
 
       this.httpService
         .axiosRef({
@@ -330,27 +330,49 @@ export class ChatService {
           response.data.on('data', (chunk: Buffer) => {
             try {
               const text = chunk.toString('utf-8');
+              const lines = text.split('\n');
 
-              const jsonStr = text.slice(6);
+              for (const line of lines) {
+                // Handle tool data
+                if (line.startsWith('Tool :')) {
+                  try {
+                    const jsonStr = line.substring(6).trim();
+                    const toolData = JSON.parse(jsonStr);
+                    // Send tool data as SSE format
+                    console.log(toolData);
 
-              try {
-                const {
-                  event,
-                  data,
-                  metadata: { langgraph_node },
-                } = JSON.parse(jsonStr) as ChatEvent;
-                if (
-                  // text.startsWith('data: ') &&
-                  data?.chunk?.content &&
-                  event === 'on_chat_model_stream' &&
-                  langgraph_node
-                ) {
-                  const text = data.chunk?.content;
-                  streamdContent += text;
-                  subscriber.next(text);
+                    subscriber.next(
+                      `data: ${JSON.stringify({
+                        type: 'tool',
+                        payload: toolData,
+                      })}\n\n`,
+                    );
+                  } catch (error) {
+                    console.log('Tool parsing error:', error);
+                  }
                 }
-              } catch(error) {
-                this.logger.log({error}, "Failed to parse stream")
+                // Handle chat content
+                else if (line.startsWith('Toly :')) {
+                  try {
+                    const jsonStr = line.substring(6).trim();
+                    const {
+                      event,
+                      data,
+                      metadata: { langgraph_node },
+                    } = JSON.parse(jsonStr);
+
+                    if (event === 'on_chat_model_stream' && langgraph_node) {
+                      const content = data.chunk?.content;
+                      if (content) {
+                        console.log(content);
+                        // Stream chat content in original format
+                        subscriber.next(`data: ${content}\n\n`);
+                      }
+                    }
+                  } catch (error) {
+                    console.log('Event parsing error:', error);
+                  }
+                }
               }
             } catch (error) {
               console.error('Stream processing error:', error);

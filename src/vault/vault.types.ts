@@ -17,7 +17,7 @@ export interface WalletSecret {
 export interface WalletResponse {
   success: boolean;
   data?: {
-    encryptedPkey?: string;
+    privateKey?: string;
     createdAt?: string;
   };
   error?: string;

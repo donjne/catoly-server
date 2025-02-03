@@ -50,7 +50,7 @@ export class VaultService implements OnModuleInit {
    * @param {string} name - Wallet identifier/name
    * @returns {Promise<{ exists: boolean, location?: string[] }>}
    */
-  private async checkWalletExists(
+  async checkWalletExists(
     name: string,
   ): Promise<{ exists: boolean; location?: string[] }> {
     const existingLocations: string[] = [];
@@ -231,7 +231,7 @@ export class VaultService implements OnModuleInit {
       return {
         success: true,
         data: {
-          encryptedPkey: encrypted,
+          privateKey: privateKey,
           createdAt: timestamp,
         },
       };
@@ -369,6 +369,42 @@ export class VaultService implements OnModuleInit {
       return {
         success: false,
         error: 'Unexpected error occurred while retrieving wallet private key',
+      };
+    }
+  }
+
+  async getWalletPublicKey(
+    name: string,
+  ): Promise<{ success: boolean; publicKey?: string; error?: string }> {
+    try {
+      // Get data from Redis
+      const redisData = await this.redisService.getValue(name);
+
+      if (!redisData) {
+        return {
+          success: false,
+          error: 'Wallet not found in Redis',
+        };
+      }
+
+      // Parse the JSON data
+      const walletData = JSON.parse(redisData);
+
+      if (!walletData.publicKey) {
+        return {
+          success: false,
+          error: 'Public key not found in wallet data',
+        };
+      }
+
+      return {
+        success: true,
+        publicKey: walletData.publicKey,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to retrieve wallet public key',
       };
     }
   }

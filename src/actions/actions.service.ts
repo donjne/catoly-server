@@ -1858,8 +1858,6 @@ export class ActionsService {
       // Calculate scaled amount
       const scaledAmount = options.inputAmount * Math.pow(10, inputDecimals);
 
-      console.log(scaledAmount);
-
       // Get quote
       const quoteResponse = await (
         await fetch(
@@ -1872,16 +1870,6 @@ export class ActionsService {
             '&maxAccounts=20',
         )
       ).json();
-
-      console.log(
-        `${this.JUP_API}/quote?` +
-          `inputMint=${isNativeSol ? this.TOKENS.SOL.toString() : inputMintPubkey.toString()}` +
-          `&outputMint=${outputMintPubkey.toString()}` +
-          `&amount=${scaledAmount}` +
-          `&slippageBps=${options.slippageBps || this.DEFAULT_OPTIONS.SLIPPAGE_BPS}` +
-          '&onlyDirectRoutes=true' +
-          '&maxAccounts=20',
-      );
 
       // Get swap transaction
       const { swapTransaction } = await (
@@ -1908,6 +1896,8 @@ export class ActionsService {
       const signature = await connection.sendTransaction(transaction);
 
       await connection.confirmTransaction(signature);
+
+      console.log(signature);
 
       return { signature };
     } catch (error) {
