@@ -355,7 +355,7 @@ export class VaultService implements OnModuleInit {
         const keyBytes = bs58.decode(decryptedPrivateKey);
         const decryptedKeypair = Keypair.fromSecretKey(keyBytes);
 
-        console.log(decryptedKeypair.publicKey.toBase58());
+        // console.log(decryptedKeypair.publicKey.toBase58());
 
         return {
           success: true,

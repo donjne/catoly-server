@@ -55,6 +55,7 @@ import { getAllTld, TldParser } from '@onsol/tldparser';
 import { getInternalAssetAccountDataSerializer } from '@nifty-oss/asset';
 import { resolve } from '@bonfida/spl-name-service';
 import axios from 'axios';
+import { VaultService } from 'src/vault/vault.service';
 
 @Injectable()
 export class DasService {
@@ -70,7 +71,10 @@ export class DasService {
     'Vote111111111111111111111111111111111111111',
   );
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private vaultService: VaultService,
+  ) {
     const heliusKey = this.configService.get<string>('HELIUS_API_KEY');
 
     if (!heliusKey) {
@@ -218,8 +222,6 @@ export class DasService {
       // }
 
       const data = (await response.data) as NativeBalanceResponse;
-
-      console.log(data);
 
       if ('error' in data) {
         throw new HttpException(
@@ -565,13 +567,16 @@ export class DasService {
     totalValueUsd: number;
   }> {
     try {
+      const inAppWallet = await this.vaultService.getWalletPublicKey(
+        params.ownerAddress,
+      );
       const [nativeBalance, tokenPortfolio] = await Promise.all([
         this.getNativeBalance({
-          ownerAddress: params.ownerAddress,
+          ownerAddress: inAppWallet.publicKey,
           network: params.network,
         }),
         this.getWalletPortfolioValue({
-          ownerAddress: params.ownerAddress,
+          ownerAddress: inAppWallet.publicKey,
           network: params.network,
         }),
       ]);
@@ -605,12 +610,7 @@ export class DasService {
         );
       }
 
-      console.log(
-        'Service - Getting RPC URL for wallet:',
-        params.walletAddress,
-      );
       const rpcUrl = await this.getRpcUrl(params.walletAddress, params.network);
-      console.log('Service - RPC URL obtained:', rpcUrl);
 
       // If no token address, get SOL balance
       if (!params.tokenAddress) {
@@ -732,9 +732,7 @@ export class DasService {
     }
   }
 
-  private async fetchTokenPrice(
-    tokenAddress: string,
-  ): Promise<TokenPriceResponse> {
+  async fetchTokenPrice(tokenAddress: string): Promise<TokenPriceResponse> {
     try {
       const response = await axios.get<any[]>(
         `https://graphql.astralane.io/api/v1/price-by-token?tokens=${tokenAddress}`,
