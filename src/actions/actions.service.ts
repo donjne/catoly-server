@@ -1186,11 +1186,15 @@ export class ActionsService {
         data.markets || [],
       );
 
+      const astralanePrices = await this.dasService.fetchTokenPrice(finalMint);
+
       // this is what peak production code looks like lol
       return {
         mint: data.mint,
         tokenProgram: data.tokenProgram,
         token: data.token || {},
+        price: astralanePrices.price || null,
+        marketCap: astralanePrices.marketCap || null,
         tokenExtensions: data.tokenExtensions || {},
         tokenMeta: data.tokenMeta || {},
         image: data.fileMeta?.image || null,

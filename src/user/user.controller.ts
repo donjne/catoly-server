@@ -43,14 +43,14 @@ export class UserController {
     }
   }
 
-  @Get('inAppWallet/:name')
+  @Get('in-app-wallet/:name')
   async inAppWallet(
     @Param('name') name: string,
   ): Promise<{ success: boolean; publicKey?: string; error?: string }> {
     return this.vaultService.getWalletPublicKey(name);
   }
 
-  @Post('createNewWallet/:name')
+  @Post('create-new-wallet/:name')
   async createNewWallet(@Param('name') name: string): Promise<WalletResponse> {
     // First check if wallet exists
     const walletStatus = await this.vaultService.checkWalletExists(name);
