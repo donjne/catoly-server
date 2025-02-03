@@ -9,6 +9,8 @@ import {
   Get,
   Param,
   BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ActionsService } from './actions.service';
 import {
@@ -104,6 +106,7 @@ export class ActionsController {
     return {
       tokenName: body.tokenName,
       tokenTicker: body.tokenTicker,
+      creatAndBuy: body.createAndBuy,
       description: body.description,
     };
   }
@@ -112,7 +115,7 @@ export class ActionsController {
   async launchPumpFunTokenTx(
     @Body()
     body: {
-      walletKeypair: string;
+      user: string;
       options: {
         tokenName: string;
         tokenTicker: string;
@@ -122,21 +125,21 @@ export class ActionsController {
     },
   ): Promise<PumpfunLaunchResponse> {
     //validate user sesh
-    return this.actionsService.launchPumpFunToken(
-      body.walletKeypair,
-      body.options,
-    );
+    return this.actionsService.launchPumpFunToken(body.user, body.options);
   }
 
   @Post('lend/usdc')
-  async lendAsset(
-    @Body() body: { walletKeypair: string; options: LendingOptions },
-  ): Promise<LendingResponse> {
-    const walletKeypair = Keypair.fromSecretKey(
-      Buffer.from(JSON.parse(body.walletKeypair)),
-    );
+  async lendAsset(@Body() body: LendingOptions): Promise<any> {
+    return {
+      amount: body.amount,
+    };
+  }
 
-    return this.actionsService.lendAsset(walletKeypair, body.options);
+  @Post('lend/usdc/tx')
+  async lendAssetTx(
+    @Body() body: { user: string; options: LendingOptions },
+  ): Promise<LendingResponse> {
+    return this.actionsService.lendAsset(body.user, body.options);
   }
 
   @Post('mint/collection-nft')
@@ -168,11 +171,18 @@ export class ActionsController {
     return this.actionsService.getTokenReportSummary(mint);
   }
 
-  @Get('token/check/detailed/:mint')
+  @Get('token/check/detailed/:mint?/:symbol?')
   async getTokenDetailedReport(
     @Param('mint') mint: string,
+    @Param('symbol') symbol?: string,
   ): Promise<TokenCheck> {
-    return this.actionsService.getTokenDetailedReport(mint);
+    if (!mint && !symbol) {
+      throw new HttpException(
+        'Either mint address or symbol must be provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return this.actionsService.getTokenDetailedReport(mint, symbol);
   }
 
   @Post('airdrop/compressed')
@@ -266,7 +276,6 @@ export class ActionsController {
 
   @Post('transfer')
   async transferTokens(@Body() body: TransferOptions): Promise<any> {
-    console.log(body);
     return {
       recipient: body.recipient,
       mintAddress: body.mintAddress,

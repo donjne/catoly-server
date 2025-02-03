@@ -417,6 +417,35 @@ export interface ResolveDomainParams extends BaseOptions {
   domain: string;
 }
 
+
+interface TokenExtensions {
+  coingeckoId: string;
+}
+
+export interface Token {
+  address: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  logoURI: string;
+  tags: string[];
+  daily_volume: number;
+  created_at: string;
+  freeze_authority: string | null;
+  mint_authority: string | null;
+  permanent_delegate: string | null;
+  minted_at: string | null;
+  extensions: TokenExtensions;
+}
+
+export interface SearchResponse {
+  success: boolean;
+  token: Token | null;
+  length: number;
+  error?: string;
+}
+
+
 // Define types for the response
 // export interface HeliusResponse {
 //   jsonrpc: string;

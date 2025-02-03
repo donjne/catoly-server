@@ -105,6 +105,7 @@ import { BN } from 'bn.js';
 import { TensorSwapSDK } from '@tensor-oss/tensorswap-sdk';
 import { VaultService } from 'src/vault/vault.service';
 import bs58 from 'bs58';
+import { DasService } from 'src/das/das.service';
 
 ///line 659
 @Injectable()
@@ -139,6 +140,7 @@ export class ActionsService {
   constructor(
     private configService: ConfigService,
     private vaultService: VaultService,
+    private dasService: DasService,
   ) {
     const heliusKey = this.configService.get<string>('HELIUS_API_KEY');
     const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
@@ -202,6 +204,20 @@ export class ActionsService {
     // Otherwise detect the network
     const detectedNetwork = await this.detectNetwork(walletKeypair);
     return this.NETWORK_URLS[detectedNetwork];
+  }
+
+  private async getMintFromSymbol(symbol: string): Promise<string | null> {
+    try {
+      const tokenInfo = await this.dasService.searchTokenBySymbol(symbol);
+      if (!tokenInfo.success || !tokenInfo.token) {
+        console.log(`No token found for symbol: ${symbol}`);
+        return null;
+      }
+      return tokenInfo.token.address;
+    } catch (error) {
+      console.error('Error fetching token by symbol:', error);
+      return null;
+    }
   }
 
   // Helper for creating connections
@@ -652,7 +668,7 @@ export class ActionsService {
   }
 
   async launchPumpFunToken(
-    wallet: string,
+    user: string,
     options: {
       tokenName: string;
       tokenTicker: string;
@@ -660,9 +676,9 @@ export class ActionsService {
       imageUrl: string;
     } & PumpFunTokenOptions,
   ): Promise<PumpfunLaunchResponse> {
-    const walletFromvault = this.vaultService.retrieveWalletPrivateKey(wallet);
+    const walletFromvault = this.vaultService.retrieveWalletPrivateKey(user);
 
-    const walletKeypair = (await walletFromvault).privateKey as Keypair;
+    const walletKeypair = (await walletFromvault).privateKey;
     try {
       // Input validation
       if (
@@ -735,9 +751,12 @@ export class ActionsService {
   }
 
   async lendAsset(
-    walletKeypair: Keypair,
+    user: string,
     options: LendingOptions,
   ): Promise<LendingResponse> {
+    const walletKeypair = (
+      await this.vaultService.retrieveWalletPrivateKey(user)
+    ).privateKey;
     try {
       // Input validation
       if (!options.amount || options.amount <= 0) {
@@ -1100,14 +1119,38 @@ export class ActionsService {
   }
 
   //response type shape is now different from ITokenDat use Any but change in time
-  async getTokenDetailedReport(mint: string): Promise<any> {
+  async getTokenDetailedReport(mint?: string, symbol?: string): Promise<any> {
     try {
-      // Log the mint address we're checking
-      console.log('Checking token mint:', mint);
+      let finalMint = mint;
 
-      // Validate mint address format
+      if (mint === 'noMint' || mint === 'undefined' || mint === '') {
+        finalMint = undefined;
+      }
+
+      // Try to get mint from symbol if no valid mint
+      if (!finalMint && symbol) {
+        console.log('Attempting to fetch from symbol:', symbol);
+        const symbolMint = await this.getMintFromSymbol(symbol);
+        if (!symbolMint) {
+          throw new HttpException(
+            `No token found with symbol: ${symbol}`,
+            HttpStatus.NOT_FOUND,
+          );
+        }
+        finalMint = symbolMint;
+      }
+
+      // At this point we must have a finalMint
+      if (!finalMint) {
+        throw new HttpException(
+          'Either mint address or symbol must be provided',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validate final mint address format
       try {
-        new PublicKey(mint);
+        new PublicKey(finalMint);
       } catch (error) {
         console.error('Invalid mint address:', error);
         throw new HttpException(
@@ -1116,12 +1159,11 @@ export class ActionsService {
         );
       }
 
-      const url = `${this.RUGCHECK_BASE_URL}/tokens/${mint}/report`;
+      const url = `${this.RUGCHECK_BASE_URL}/tokens/${finalMint}/report`;
 
       const response = await fetch(url);
 
       if (!response.ok) {
-        // Get the error message from the response if possible
         const errorText = await response.text();
         console.error('RugCheck API error details:', {
           status: response.status,
@@ -1138,28 +1180,30 @@ export class ActionsService {
       const data: ITokenData = await response.json();
       console.log('Successfully got token report');
 
+      // Add null checks for topHolders and markets
       const holderSummaryReport = await this.getTokenDetailedReportUtils(
-        data.topHolders,
-        data.markets,
+        data.topHolders || [],
+        data.markets || [],
       );
 
+      // this is what peak production code looks like lol
       return {
         mint: data.mint,
         tokenProgram: data.tokenProgram,
-        token: data.token,
-        tokenExtensions: data.tokenExtensions,
-        tokenMeta: data.tokenMeta,
-        image: data.fileMeta.image,
+        token: data.token || {},
+        tokenExtensions: data.tokenExtensions || {},
+        tokenMeta: data.tokenMeta || {},
+        image: data.fileMeta?.image || null,
         holderSummary: holderSummaryReport,
-        freezeAuthority: data.freezeAuthority,
-        mintAuthority: data.mintAuthority,
-        graphInsiderReport: data.graphInsiderReport,
-        risks: data.risks,
-        score: data.score,
-        totalMarketLiquidity: data.totalMarketLiquidity,
-        totalLPProviders: data.totalLPProviders,
-        rugged: data.rugged,
-        knownAccounts: data.knownAccounts,
+        freezeAuthority: data.freezeAuthority || null,
+        mintAuthority: data.mintAuthority || null,
+        graphInsiderReport: data.graphInsiderReport || null,
+        risks: data.risks || [],
+        score: data.score || null,
+        totalMarketLiquidity: data.totalMarketLiquidity || 0,
+        totalLPProviders: data.totalLPProviders || 0,
+        rugged: data.rugged || false,
+        knownAccounts: data.knownAccounts || {},
       };
     } catch (error) {
       console.error('Full error details:', error);

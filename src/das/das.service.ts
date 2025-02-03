@@ -46,6 +46,8 @@ import {
   GetCompleteBalanceParams,
   FilteredAsset,
   GetAssetsByOwnerResponseWithFiltered,
+  SearchResponse,
+  Token,
 } from './das.types';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getAllTld, TldParser } from '@onsol/tldparser';
@@ -746,7 +748,6 @@ export class DasService {
         },
       );
 
-      console.log(response);
       // Return only the data property and take the first item if it's an array
       if (
         !response.data ||
@@ -811,6 +812,35 @@ export class DasService {
       );
     }
   }
+
+  searchTokenBySymbol = async (symbol: string): Promise<SearchResponse> => {
+    try {
+      const response = await axios.get<Token[]>(
+        'https://tokens.jup.ag/tokens?tags=verified',
+      );
+      const tokens = response.data;
+
+      // Find the token that matches the symbol (case insensitive)
+      const token = tokens.find(
+        (token) => token.symbol.toLowerCase() === symbol.toLowerCase(),
+      );
+
+      // Return formatted response
+      return {
+        success: true,
+        token: token || null,
+        length: tokens.length,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        token: null,
+        length: 0,
+        error:
+          error instanceof Error ? error.message : 'An unknown error occurred',
+      };
+    }
+  };
 
   async getAllTLDs(options?: GetTLDParams): Promise<TLDResponse> {
     try {

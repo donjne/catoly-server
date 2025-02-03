@@ -272,4 +272,9 @@ export class DasController {
   async getOwnership(@Param('address') address: string) {
     return await this.dasService.checkAddressOwnership(address);
   }
+
+  @Get('searchBySymbol/:mint')
+  async searchBySymbol(@Param('mint') mint: string) {
+    return await this.dasService.searchTokenBySymbol(mint);
+  }
 }
