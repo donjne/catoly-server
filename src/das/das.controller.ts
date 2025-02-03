@@ -268,6 +268,15 @@ export class DasController {
     return this.dasService.getAsset({ id, network });
   }
 
+  @Get('tokens/:ids')
+  async getAssets(
+    @Param('ids') ids: string,
+    @Query('network') network?: 'mainnet' | 'devnet',
+  ) {
+    const tokenIds = ids.split(',');
+    return this.dasService.getAssets({ ids: tokenIds, network });
+  }
+
   @Get('ownership/:address')
   async getOwnership(@Param('address') address: string) {
     return await this.dasService.checkAddressOwnership(address);

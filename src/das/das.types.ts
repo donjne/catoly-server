@@ -417,7 +417,6 @@ export interface ResolveDomainParams extends BaseOptions {
   domain: string;
 }
 
-
 interface TokenExtensions {
   coingeckoId: string;
 }
@@ -445,6 +444,10 @@ export interface SearchResponse {
   error?: string;
 }
 
+export interface GetAssetsParams {
+  ids: string[];
+  network?: 'mainnet' | 'devnet';
+}
 
 // Define types for the response
 // export interface HeliusResponse {

@@ -48,6 +48,7 @@ import {
   GetAssetsByOwnerResponseWithFiltered,
   SearchResponse,
   Token,
+  GetAssetsParams,
 } from './das.types';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getAllTld, TldParser } from '@onsol/tldparser';
@@ -304,6 +305,54 @@ export class DasService {
       }
 
       return data.result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Internal server error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async getAssets(params: GetAssetsParams) {
+    try {
+      const rpcUrl = await this.getRpcUrl(undefined, params.network);
+
+      const requests = params.ids.map((id) => ({
+        jsonrpc: '2.0',
+        id: `helius-das-${id}`,
+        method: 'getAsset',
+        params: { id },
+      }));
+
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requests),
+      });
+
+      if (!response.ok) {
+        throw new HttpException(
+          'Failed to fetch assets from Helius',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const data = (await response.json()) as HeliusResponse[];
+
+      const errors = data.filter((d) => 'error' in d);
+      if (errors.length) {
+        throw new HttpException(
+          errors[0].error || 'Failed to fetch assets',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return data.map((d) => d.result);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
