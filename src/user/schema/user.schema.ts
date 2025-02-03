@@ -19,6 +19,12 @@ export class User {
     })
     address: string;
 
+    @Prop({ 
+        unique: true,
+        trim: true,
+    })
+    inAppAddress: string;
+
     @Prop()
     email: string;
 

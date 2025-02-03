@@ -565,11 +565,15 @@ export class DasService {
     nativeBalance: FormattedNativeBalance;
     tokenPortfolio: PortfolioValue;
     totalValueUsd: number;
-  }> {
+  } | { success: boolean; publicKey?: string; error?: string }> {
     try {
       const inAppWallet = await this.vaultService.getWalletPublicKey(
         params.ownerAddress,
       );
+
+      if (!inAppWallet.success) {
+        return inAppWallet
+      }
       const [nativeBalance, tokenPortfolio] = await Promise.all([
         this.getNativeBalance({
           ownerAddress: inAppWallet.publicKey,

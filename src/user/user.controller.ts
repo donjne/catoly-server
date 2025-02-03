@@ -22,6 +22,7 @@ export class UserController {
       const payload = {
         id: data['_id'],
         address: data.address,
+        inAppWallet: data?.inAppAddress || '',
         email: data.email,
       };
 

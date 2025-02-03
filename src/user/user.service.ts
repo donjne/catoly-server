@@ -64,4 +64,20 @@ export class UserService {
             throw error
         }
     }
+
+    async setUserInAppWallet(
+        address: string,
+        inAppAddress: string
+    ): Promise<User>{
+        try {
+           return this.userModel.findOneAndUpdate(
+            { address },
+            { inAppAddress },
+            { new: true }
+           ) 
+        } catch (error) {
+            console.log("Failed to update user inApp wallet");
+            throw error 
+        }
+    }
 }
