@@ -5,20 +5,29 @@ import {
   DexScreenerResponse,
   GeckoDexResponse,
   PoolResponse,
+  ProfitableWalletsParams,
   SimplifiedPool,
   TradesResponse,
+  WalletData,
 } from './gecko.types';
 import axios from 'axios';
 import { DasService } from 'src/das/das.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GeckoService {
   private readonly baseUrl = 'https://api.geckoterminal.com/api/v2';
   private readonly dexscreener = 'https://api.dexscreener.com/latest/dex';
+  private readonly astralane = 'https://graphql.astralane.io/api/v1/dataset';
+  private readonly astralaneKey: string;
+
   constructor(
     private readonly httpService: HttpService,
     private readonly dasService: DasService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.astralaneKey = this.configService.get<string>('ASTRALANE_KEY');
+  }
 
   async getDexsOnSolana(page: number = 1): Promise<GeckoDexResponse> {
     try {
@@ -42,6 +51,41 @@ export class GeckoService {
         );
       }
       throw new Error('Failed to fetch Solana DEXes');
+    }
+  }
+
+  async getProfitableWallets(
+    params: ProfitableWalletsParams = {},
+  ): Promise<WalletData[]> {
+    const { time = '10h', page = 1, limit = 10 } = params;
+
+    try {
+      const queryParams = new URLSearchParams({
+        time: time.toString(),
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      const response = await fetch(
+        `${this.astralane}/profitable-wallets?${queryParams}`,
+        {
+          method: 'GET',
+          headers: {
+            'x-api-key': this.astralaneKey,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data as WalletData[];
+    } catch (error) {
+      console.error('Error fetching profitable wallets:', error);
+      throw error;
     }
   }
 

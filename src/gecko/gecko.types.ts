@@ -211,3 +211,16 @@ export interface TrendingPool {
   price_change_in_m5: number;
   image?: string;
 }
+
+export interface WalletData {
+  wallet: string;
+  pnl_overview: number;
+  trade_volume: number;
+  trade_count: number;
+}
+
+export interface ProfitableWalletsParams {
+  time?: string; // e.g., "10h"
+  page?: number;
+  limit?: number;
+}
