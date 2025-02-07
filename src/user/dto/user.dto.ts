@@ -10,6 +10,7 @@ export class CreateUserPayload extends User {}
 export class userJwtData {
     id: ObjectId
     address: string
+    inAppWallet?: string 
     email: string
 }
 

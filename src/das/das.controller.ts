@@ -6,6 +6,8 @@ import {
   ParseBoolPipe,
   ParseIntPipe,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { DasService } from './das.service';
 import {
@@ -25,6 +27,8 @@ import {
   TPSResponse,
   TransactionsResponse,
 } from './das.types';
+import { AuthGuard } from 'src/guard/auth.guard';
+import { Request } from 'express';
 
 @Controller('das')
 export class DasController {
@@ -113,19 +117,31 @@ export class DasController {
   }
 
   @Get('native-balance/:address')
+  @UseGuards(AuthGuard)
   async getNativeBalance(
-    @Param('address') ownerAddress: string,
+    // @Param('address') ownerAddress: string,
+     @Req() request: Request,
     @Query('network') network?: 'mainnet' | 'devnet',
   ): Promise<FormattedNativeBalance> {
-    return this.dasService.getNativeBalance({ ownerAddress, network });
+    const user = request['user'];
+    return this.dasService.getNativeBalance({
+      ownerAddress: user.address,
+      network
+    });
   }
-
-  @Get('portfolio/:address')
+  
+  @Get('portfolio')
+  @UseGuards(AuthGuard)
   async getCompleteBalance(
-    @Param('address') ownerAddress: string,
+    // @Param('address') ownerAddress: string,
+    @Req() request: Request,
     @Query('network') network?: 'mainnet' | 'devnet',
   ) {
-    return this.dasService.getCompleteWalletBalance({ ownerAddress, network });
+    const user = request['user'];
+    return this.dasService.getCompleteWalletBalance({
+      ownerAddress: user.address,
+      network
+    });
   }
 
   /// fix up the response endpoint

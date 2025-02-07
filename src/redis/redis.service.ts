@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { redis } from './redis.config';
 import Redis, { ChainableCommander } from 'ioredis';
+import { BackupService } from 'src/backup/backup.service';
 
 /**
  * Service for handling Redis operations in a NestJS application.
@@ -9,7 +10,9 @@ import Redis, { ChainableCommander } from 'ioredis';
  */
 @Injectable()
 export class RedisService implements OnModuleDestroy {
-  constructor() {}
+  constructor(
+    private backUpService: BackupService
+  ) {}
 
   /**
    * Cleanup method called when the module is being destroyed.
@@ -25,6 +28,39 @@ export class RedisService implements OnModuleDestroy {
    */
   getClient(): Redis {
     return redis;
+  }
+
+  async restore(path: string): Promise<boolean> {
+    try {
+      // Find the most recent backup from MongoDB
+      const backup = await this.backUpService.model().findOne(
+        { path },
+        {},
+        { sort: { deletedAt: -1 } }
+      );
+
+      if (!backup) {
+        throw new Error(`No backup found for Redis key: ${path}`);
+      }
+
+      // Check if path already exists in Redis
+      try {
+        const exists = await redis.exists(path);
+        if (exists) {
+          throw new Error(`path already exists in Redis at: ${path}`);
+        }
+      } catch (error) {
+        // Expected error if path doesn't exist
+      }
+
+      // Restore the path to Redis with appropriate data type
+      await this.setValue(backup.path, backup.data);
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to restore Redis path at ${path}:`, error);
+      return false;
+    }
   }
 
   /**
