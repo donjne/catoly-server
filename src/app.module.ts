@@ -13,6 +13,8 @@ import { WhitelistModule } from './whitelist/whitelist.module';
 import { ChatModule } from './chat/chat.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './user/user.module';
+import { BackupModule } from './backup/backup.module';
+import { RedisModule } from './redis/redis.module';
 
 
 @Module({
@@ -43,6 +45,7 @@ import { UserModule } from './user/user.module';
     AdminModule,
     ChatModule,
     UserModule,
+    BackupModule
   ],
   controllers: [AppController],
   providers: [AppService],

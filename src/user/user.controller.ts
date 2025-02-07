@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Post, Res } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserPayload, responseObect } from './dto/user.dto';
 import { Response } from 'express';
 import { VaultService } from 'src/vault/vault.service';
 import { WalletResponse } from 'src/vault/vault.types';
+import { APIResponse } from 'src/utils/types';
 
 @Controller('user')
 export class UserController {
@@ -64,5 +65,21 @@ export class UserController {
 
     // If wallet doesn't exist, create it
     return this.vaultService.storeWalletKey(name);
+  }
+
+  @Delete('revoke/:address')
+  async revokeWallet(
+    @Param() address: Record<string, string>
+  ): Promise<APIResponse> {
+    try {
+      const data = await this.userService.revokeUserWallet(address.address)
+      return {
+        message: 'Successfully revoked wallet',
+        status: true,
+        data
+      }
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to revoke user wallet')
+    }
   }
 }

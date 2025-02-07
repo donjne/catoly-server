@@ -22,6 +22,7 @@ export class AuthController {
               {
                 id: claims.id,
                 address: claims.address,
+                inAppWallet: claims?.inAppWallet || '',
                 email: claims.email
               }
             )

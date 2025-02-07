@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, forwardRef, Inject } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import * as vault from 'node-vault';
 import { VaultSecret, VaultResponse, WalletResponse } from './vault.types';
@@ -6,6 +6,7 @@ import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { RedisService } from 'src/redis/redis.service';
 import { UserService } from 'src/user/user.service';
+import { BackupService } from 'src/backup/backup.service';
 
 @Injectable()
 export class VaultService implements OnModuleInit {
@@ -14,7 +15,9 @@ export class VaultService implements OnModuleInit {
 
   constructor(
     private readonly redisService: RedisService,
-    private userService: UserService
+    @Inject(forwardRef(() => UserService))
+    private userService: UserService,
+    private backUpService: BackupService
   ) {
     const options = {
       apiVersion: 'v1',
@@ -64,6 +67,7 @@ export class VaultService implements OnModuleInit {
       const redisData = await this.redisService.getValue(`${name}`);
 
       if (redisData) {
+        this.logger.debug(`Wallet exists in Redis: ${name}`);
         existingLocations.push('Redis');
       }
     } catch (error) {
@@ -75,7 +79,7 @@ export class VaultService implements OnModuleInit {
     const vaultResponse = await this.readSecret(`wallets/${name}`);
     if (vaultResponse.success && vaultResponse.data?.privateKey) {
       this.logger.debug(`Wallet exists in Vault: ${name}`);
-      existingLocations.push('Vault');
+      // existingLocations.push('Vault');
     }
 
     return {
@@ -131,15 +135,15 @@ export class VaultService implements OnModuleInit {
     }
   }
 
-  async deleteSecret(path: string): Promise<VaultResponse> {
-    try {
-      await this.client.delete(`secret/data/${path}`);
-      return { success: true };
-    } catch (error) {
-      this.logger.error(`Failed to delete secret at path ${path}`, error);
-      return { success: false, error: error.message };
-    }
-  }
+  // async deleteSecret(path: string): Promise<VaultResponse> {
+  //   try {
+  //     await this.client.delete(`secret/data/${path}`);
+  //     return { success: true };
+  //   } catch (error) {
+  //     this.logger.error(`Failed to delete secret at path ${path}`, error);
+  //     return { success: false, error: error.message };
+  //   }
+  // }
 
   async listSecrets(path: string = ''): Promise<VaultResponse> {
     try {
@@ -416,6 +420,69 @@ export class VaultService implements OnModuleInit {
         success: false,
         error: 'Failed to retrieve wallet public key',
       };
+    }
+  }
+
+  async deleteSecret(path: string): Promise<VaultResponse> {
+    // First backup the secret before deletion
+    try {
+      
+      const deletePath = `secret/data/wallets/${path}`
+      const secret = await this.client.read(deletePath);
+      
+      if (secret?.data) {
+        await this.backUpService.create({
+          path,
+          data: secret.data,
+          deletedAt: new Date(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hour retention
+        });
+      }
+  
+      // Then delete from vault
+      await this.client.delete(deletePath);
+      return {
+        success: true,
+      }
+    } catch (error) {
+      console.log('Vault Error', error);
+      
+    }
+  }
+
+  async restoreSecret(path: string): Promise<boolean> {
+    try {
+      // Find the most recent backup
+      const backup = await this.backUpService.model().findOne(
+        { path },
+        {},
+        { sort: { deletedAt: -1 } }
+      );
+
+      if (!backup) {
+        throw new Error(`No backup found for path: ${path}`);
+      }
+
+      // Check if secret already exists in Vault
+      const readPath = `secret/data/wallets/${path}`
+      try {
+        const existing = await this.client.read(readPath);
+        if (existing) {
+          throw new Error(`Secret already exists at path: ${readPath}`);
+        }
+      } catch (error) {
+        // Expected error if secret doesn't exist
+        console.log("Restore Wallet error", error);
+        
+      }
+
+      // Restore the secret to Vault
+      await this.writeSecret(backup);
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to restore secret at ${path}:`, error);
+      return false;
     }
   }
 }

@@ -40,6 +40,32 @@ export class User {
         default: UserRole.USER 
     })
     role: UserRole;
+
+    @Prop({
+        type: String,
+        default: ''
+    })
+    status: string
+
+    @Prop({
+        type: Date
+    })
+    deletionStartedAt: Date
+
+    @Prop({
+        type: Boolean
+    })
+    mongoDeleted: boolean
+
+    @Prop({
+        type: Boolean
+    })
+    redisDeleted: boolean
+
+    @Prop({
+        type: Boolean
+    })
+    vaultDeleted: boolean
 }
 
 
