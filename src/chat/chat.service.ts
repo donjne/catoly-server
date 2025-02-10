@@ -311,7 +311,7 @@ export class ChatService {
 
   getStreamingAIResponse(question: string, thread_id: number): Observable<any> {
     return new Observable((subscriber) => {
-      const streamdContent = '';
+      let streamdContent = '';
 
       this.httpService
         .axiosRef({
@@ -329,8 +329,12 @@ export class ChatService {
         .then((response) => {
           response.data.on('data', (chunk: Buffer) => {
             try {
+              // console.log("Chunk", chunk);
+              
               const text = chunk.toString('utf-8');
               const lines = text.split('\n');
+              console.log(lines);
+              
 
               for (const line of lines) {
                 // Handle tool data
@@ -339,7 +343,7 @@ export class ChatService {
                     const jsonStr = line.substring(6).trim();
                     const toolData = JSON.parse(jsonStr);
                     // Send tool data as SSE format
-                    console.log(toolData);
+                    // console.log(toolData);
 
                     subscriber.next(
                       `data: ${JSON.stringify({
@@ -364,7 +368,8 @@ export class ChatService {
                     if (event === 'on_chat_model_stream' && langgraph_node) {
                       const content = data.chunk?.content;
                       if (content) {
-                        console.log(content);
+                        streamdContent += content
+                        // console.log("Content",content);
                         // Stream chat content in original format
                         subscriber.next(`data: ${content}\n\n`);
                       }
@@ -380,7 +385,15 @@ export class ChatService {
           });
 
           response.data.on('end', () => {
-            console.log('Complete response:', streamdContent);
+            // console.log('Complete response:', streamdContent);
+            this.logger.log("Complete content", streamdContent)
+
+            subscriber.next({
+              type: 'content',
+              payload: null,
+              completeContent: streamdContent
+            });
+
             subscriber.complete();
           });
 

@@ -17,6 +17,7 @@ import {
   Sse,
   Res,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { PrivyAuthGuard } from '../auth/privy.guard';
@@ -33,6 +34,7 @@ import { AddMessageProps } from './chat.dto';
 @Controller('chat')
 @UseGuards(AuthGuard)
 export class ChatController {
+  logger = new Logger(ChatController.name)
   constructor(private chatService: ChatService) {}
 
   @Post('create-conversations')
@@ -151,7 +153,7 @@ export class ChatController {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('Connection', 'keep-alive');
-    let AIResponse = '';
+    let AIResponse = "";
 
     const user = request['user'];
 
@@ -176,14 +178,18 @@ export class ChatController {
 
     this.chatService.getStreamingAIResponse(question, newThreadId).subscribe({
       next: (chunk) => {
-        AIResponse += chunk;
-        response.write(chunk);
+        if (typeof chunk == 'string') {
+          response.write(chunk);
+        } else {
+          AIResponse += chunk.completeContent
+        }
       },
       error: (error) => {
         response.end();
       },
       complete: async () => {
         if (AIResponse) {
+          this.logger.log('This is the saved response', AIResponse)
           response.end(async () => {
             await this.chatService.addMessage({
               content: AIResponse,
