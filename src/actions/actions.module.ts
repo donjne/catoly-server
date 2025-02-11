@@ -12,6 +12,6 @@ import { BackupModule } from 'src/backup/backup.module';
   controllers: [ActionsController],
   providers: [ActionsService, VaultService, RedisService, DasService],
   exports: [ActionsService],
-  imports: [UserModule, BackupModule]
+  imports: [UserModule, BackupModule],
 })
 export class ActionsModule {}

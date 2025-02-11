@@ -44,7 +44,6 @@ import {
   TransferResponse,
 } from './actions.types';
 import { Keypair, PublicKey } from '@solana/web3.js';
-import bs58 from 'bs58';
 
 @Controller('actions')
 export class ActionsController {

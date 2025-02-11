@@ -104,8 +104,8 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { BN } from 'bn.js';
 import { TensorSwapSDK } from '@tensor-oss/tensorswap-sdk';
 import { VaultService } from 'src/vault/vault.service';
-import bs58 from 'bs58';
 import { DasService } from 'src/das/das.service';
+import { Helius } from 'helius-sdk';
 
 ///line 659
 @Injectable()
@@ -137,6 +137,8 @@ export class ActionsService {
   private readonly JUP_REFERRAL_ADDRESS =
     'jrfva3S8qbHidkk5LuVa1YrCAkiEVNnxj5QkqyEkVBm';
 
+  private helius: Helius;
+
   constructor(
     private configService: ConfigService,
     private vaultService: VaultService,
@@ -156,6 +158,7 @@ export class ActionsService {
     this.heliusDevnetUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
     this.NETWORK_URLS.mainnet = this.heliusMainnetUrl;
     this.NETWORK_URLS.devnet = this.heliusDevnetUrl;
+    this.helius = new Helius(heliusKey);
 
     this.openai = new OpenAI({
       apiKey: openaiKey,
@@ -1703,7 +1706,7 @@ export class ActionsService {
         }
       } catch (error) {
         throw new HttpException(
-          `No token account found for mint ${options.nftMint}`,
+          `No token account found for mint ${error}`,
           HttpStatus.NOT_FOUND,
         );
       }
@@ -1887,11 +1890,13 @@ export class ActionsService {
     const walletKeypair = (
       await this.vaultService.retrieveWalletPrivateKey(user)
     ).privateKey;
+
     try {
       const connection = await this.createConnection(
         await walletKeypair,
         options,
       );
+
       const outputMintPubkey = new PublicKey(options.outputMint);
       const inputMintPubkey = options.inputMint
         ? new PublicKey(options.inputMint)
@@ -1919,9 +1924,9 @@ export class ActionsService {
         )
       ).json();
 
-      // Get swap transaction
-      const { swapTransaction } = await (
-        await fetch(`${this.JUP_API}/swap`, {
+      // Get swap instructions
+      const swapInstructions = await (
+        await fetch(`${this.JUP_API}/swap-instructions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1930,22 +1935,72 @@ export class ActionsService {
             quoteResponse,
             userPublicKey: walletKeypair.publicKey.toString(),
             wrapAndUnwrapSol: true,
-            dynamicComputeUnitLimit: true,
-            prioritizationFeeLamports: 'auto',
+            computeUnitPriceMicroLamports: 0,
+            dynamicComputeUnitLimit: false,
+            prioritizationFeeLamports: null,
           }),
         })
       ).json();
 
-      // Execute swap
-      const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
-      const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
-      transaction.sign([walletKeypair]);
+      if (swapInstructions.error) {
+        throw new Error(
+          'Failed to get swap instructions: ' + swapInstructions.error,
+        );
+      }
 
-      const signature = await connection.sendTransaction(transaction);
+      const { setupInstructions, swapInstruction, cleanupInstruction } =
+        swapInstructions;
+
+      const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(
+        'ComputeBudget111111111111111111111111111111',
+      );
+
+      const deserializeInstruction = (instruction) => {
+        if (!instruction) return null;
+
+        // Skip if it's a compute budget instruction
+        const programId = new PublicKey(instruction.programId);
+        if (programId.equals(COMPUTE_BUDGET_PROGRAM_ID)) {
+          return null;
+        }
+
+        return new TransactionInstruction({
+          programId,
+          keys: instruction.accounts.map((key) => ({
+            pubkey: new PublicKey(key.pubkey),
+            isSigner: key.isSigner,
+            isWritable: key.isWritable,
+          })),
+          data: Buffer.from(instruction.data, 'base64'),
+        });
+      };
+
+      // Collect instructions WITHOUT compute budget instructions
+      const allInstructions = [
+        ...(setupInstructions || []).map(deserializeInstruction),
+        deserializeInstruction(swapInstruction),
+        cleanupInstruction ? deserializeInstruction(cleanupInstruction) : null,
+      ].filter(Boolean); // This removes any null values
+
+      console.log(
+        'Sending transaction with instructions count:',
+        allInstructions.length,
+      );
+
+      const signature = await this.helius.rpc.sendSmartTransaction(
+        allInstructions,
+        [walletKeypair],
+        [], // No lookup tables for now
+        {
+          skipPreflight: true,
+          maxRetries: 0,
+          preflightCommitment: 'confirmed',
+        },
+      );
 
       await connection.confirmTransaction(signature);
 
-      console.log(signature);
+      console.log('Transaction confirmed:', signature);
 
       return { signature };
     } catch (error) {
