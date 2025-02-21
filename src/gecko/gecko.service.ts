@@ -7,6 +7,8 @@ import {
   PoolResponse,
   ProfitableWalletsParams,
   SimplifiedPool,
+  TopTrader,
+  TopTraderParams,
   TradesResponse,
   WalletData,
 } from './gecko.types';
@@ -86,6 +88,40 @@ export class GeckoService {
     } catch (error) {
       console.error('Error fetching profitable wallets:', error);
       throw error;
+    }
+  }
+
+  async getTopTraders(params: TopTraderParams): Promise<TopTrader[]> {
+    const { token, time = '24h', limit = 20, offset = 0 } = params;
+
+    try {
+      const queryParams = new URLSearchParams({
+        token: token,
+        time: time.toString(),
+        limit: limit.toString(),
+        offset: offset.toString(),
+      });
+
+      const response = await fetch(
+        `${this.astralane}/top-traders?${queryParams}`,
+        {
+          method: 'GET',
+          headers: {
+            'x-api-key': this.astralaneKey,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data as TopTrader[];
+    } catch (error) {
+      console.error('Error fetching top traders:', error);
+      throw new Error(`Failed to fetch top traders: ${error.message}`);
     }
   }
 

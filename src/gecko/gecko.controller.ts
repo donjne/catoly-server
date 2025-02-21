@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { GeckoService } from './gecko.service';
-import { GeckoDexResponse, PoolResponse, SimplifiedPool } from './gecko.types';
+import { GeckoDexResponse, PoolResponse, SimplifiedPool, TopTrader } from './gecko.types';
 import { HttpService } from '@nestjs/axios';
 
 @Controller('gecko')
@@ -62,6 +62,21 @@ export class GeckoController {
       poolAddress,
       minVolume,
     );
+  }
+
+  @Get('top-traders/:token')
+  async getTopTraders(
+    @Param('token') token: string,
+    @Query('time') time: string = '24h',
+    @Query('limit') limit: number = 20,
+    @Query('offset') offset: number = 0,
+  ): Promise<TopTrader[]> {
+    return this.geckoService.getTopTraders({
+      token,
+      time,
+      limit,
+      offset,
+    });
   }
 
   @Get('profitable-wallets')

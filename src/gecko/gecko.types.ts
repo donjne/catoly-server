@@ -224,3 +224,18 @@ export interface ProfitableWalletsParams {
   page?: number;
   limit?: number;
 }
+
+export interface TopTraderParams {
+  token: string;
+  time?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface TopTrader {
+  wallet: string;
+  trade_volume: number;
+  trade_count: number;
+  volume_buy: number;
+  volume_sell: number;
+}
